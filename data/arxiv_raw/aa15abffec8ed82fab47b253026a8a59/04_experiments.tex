@@ -1,0 +1,197 @@
+\section{Results}
+\label{sx:experiments}
+
+\subsection{Data and Standardization}
+We study the ECMWF ERA5 dataset~\citep{era5} of atmospheric states. This dataset is the result of reanalysis, or fitting a physics simulation to sparse historical data, thereby generating a "movie" of atmospheric state, with values sampled in a dense regular grid over space and time. The frames are sampled hourly from 1 January 1959 to 10 January 2023, resulting in 561,264 frames.
+
+From this dataset we extracted two subsets for study: a surface level dataset and a vertical levels dataset which spans a range of elevations from the surface up to the lower stratosphere. The surface dataset contains four variables: temperature at 2~m, pressure at surface, and the 2D (zonal and meridional) wind velocity at 10~m. The vertical levels are in fact pressure levels, or isosurfaces of constant pressure, and contain five variables for each level: temperature, specific humidity, geopotential, and the 2D wind velocities. 
+%As is common practice, the elevation levels are not defined by elevation per se, but rather they are pressure levels, or isosurfaces of constant pressure. 
+Of ERA5's full complement of 137 pressure levels, we selected 13, at 50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, and 1000~hPa. When represented in uncompressed 32-bit floating point, these two datasets are 6 TB and 97 TB respectively.
+We standardize all atmospheric variables to zero mean, unit standard deviation per pressure level based on the mean and standard deviation computed across all frames of the training dataset.
+
+\subsection{Train/test split and generalisation}
+
+In order to assess the generalization capabilities of our models, we split the data into a training set spanning 1 January 1959 through 31 December 2009, representing 447,072 frames over 51 years, and a test set spanning 1 January 2010 through 10 January 2023, representing 114,192 frames over slightly more than 13 years. Section \ref{sx:discuss:generalisation} investigates if and how reconstruction error deteriorates as a function of time across the test set.
+%
+When comparing to the baseline method \citep{huang2022compressing}, we use the dates and timestamps of their ``Dataset 2'', namely 366 frames at midnight of each day in 2016.
+
+\subsubsection{Conditioning on side information}
+
+As terrain features have significant impact on the evolution of atmospheric state, we hypothesized that performance could be improved by augmenting the model with orographic information.
+In addition to the atmospheric variables being compressed, the encoder is provided with 6 additional channels of information, corresponding to: the logarithm of the elevation in meters plus 1~m (where elevation had been cropped to be between 0 and 8850~m); the binary land/sea mask, the cosine and sine of the colatitude in radians; the cosine and sine of the longitude in radians. We obtained elevation data from the Google Earth Engine, accessing the GTOPO30 Global 30 Arc-Second Elevation from USGS (at about 1km resolution)\footnote{\url{https://developers.google.com/earth-engine/datasets/catalog/USGS_GTOPO30}}; NaN elevation values correspond to seas: we replace them by 0 for the elevation channel, while also using them to create the second channel with land-sea mask.
+
+Vertical models are trained to reconstruct one pressure level at a time, conditioned on the target vertical level.
+We incorporate this information using FiLM layers (feature-wise linear modulation, \citet{perez2018film}) throughout the encoder and decoder.
+For simplicity, in these experiments we represent the pressure level as one-hot vector with 13 elements; FiLM at a given layer then corresponds to incorporating a learnable scale and offset per pressure level.
+
+\subsection{Compression Results}
+
+We present experimental support for the following claims:
+\begin{enumerate}
+    \item We achieve compression ratios of $1000\times$ and above while keeping the mean absolute error (MAE) low, around 0.4$^\circ$~K (for temperature), around 0.5 $\text{m}/\text{s}$ (for zonal and meridional wind), below 1 hPa for surface pressure and around 50 $\text{m}^2/\text{s}^2$ for geopotential.
+    \label{claim:cr_and_mae}
+    \item Only a small number of reconstructed pixels exhibit errors that exceed given thresholds: about 0.5\% pixels beyond 1$^\circ$~K error in temperature, about 0.5\% pixels beyond 1 $\text{m}/\text{s}$ error in zonal and meridional wind, about 0.15\% pixels beyond 1 hPa error in surface pressure, and about 0.05\% pixels beyond 100 $\text{m}^2/\text{s}^2$ error in geopotential. \label{claim:few_bad_pixels}
+    \item Our spectral error is kept low, preserving most high-frequency features in the reconstruction images.
+    \item We preserve rare and extreme events such as hurricanes and heat waves.
+\end{enumerate}
+%
+Below we evaluate a number of models, described in section~\ref{sx:methods:networks}. Of these, the hyperprior model trained with rate-distortion penalty coefficient 0.025 achieved a compression ratio of around $1000 \times$ while satisfying all of the above claims, in particular preserving the spectral error over most spatial scales. For comparison, we also exhibit the VQ-VAE with 3 downsampling blocks, which outputs $36 \times 36$ VQ maps of 13-bit (or 8192-element) indices into a learned codebook of quantized vectors; that VQ-VAE model achieves a compression ratio $1100 \times$. We observe that the VQ-GAN architecture with similar VQ code dictionary size and number of layers performed similarly to VQ-VAE, which is why we focus only on the VQ-VAE in the analysis.
+Finally, we compare these models with a VQ-VAE with 4 downsampling blocks trained exclusively to reconstruct one single variable (geopotential), with a compression ratio of $1800 \times$, and we discuss the advantages and drawbacks of single-channel compressors.
+
+
+\subsection{High compression ratio with low RMSE \& MAE}
+
+We first define the metrics and notation used in the results. Following the notation of \cite{lam2023graphcast}, we define $D_{\text{eval}}$ as the set of evaluation dates and timestamps, $G_h$ as the grid of $256 \times 256$ pixels in HEALPix tile $h$, while $x_{j,i}$ and $\hat x_{j,i}$ respectively are the ground truth and the reconstruction at the $i$-th pixel of a grid at the $j$-th variable and pressure level. Equations \ref{eq:mae} and \ref{eq:rmse} describe the MAE and RMSE metrics we use for HEALPix projection results.
+
+\begin{equation}
+    \text{MAE} (j) = \frac{1}{12 \times | D_{\text{eval}} |} \sum _{d \in D_{\text{eval}}, 0 \leq h \leq 11} \frac{1}{| G_h |} \sum _{i \in G_h} | x_{j,i} - \hat x_{j,i} |
+    \label{eq:mae}
+\end{equation}
+
+\begin{equation}
+    \text{RMSE} (j) = \frac{1}{12 \times | D_{\text{eval}} |} \sum _{d \in D_{\text{eval}}, 0 \leq h \leq 11} \sqrt{\frac{1}{| G_h |} \sum _{i \in G_h} || x_{j,i} - \hat x_{j,i} ||_2^2}
+    \label{eq:rmse}
+\end{equation}
+
+On the re-projected latitude/longitude grid $G_{0.25^\circ}$ of cells spaced by $0.25^\circ$, we define weighted MAE (Eq. \ref{eq:weighted_mae}) and weighted RMSE (Eq. \ref{eq:weighted_rmse}) as weighted by coefficient $a_i$ which is proportional to the area of the latitude/longitude cell (i.e., to the cosine of the colatitude of the $i$-th cell of latitude/longitude grid) and normalized to sum to 1 over the grid. We also define the traditional weighted RMSE, used by \citet{huang2022compressing}, in Equation \ref{eq:weighted_rmse_trad}.
+
+\begin{equation}
+    \text{wMAE} (j) = \frac{1}{| D_{\text{eval}} |} \sum _{d \in D_{\text{eval}}} \frac{1}{| G_h |} \sum _{i \in G_{0.25^\circ}} a_i | x_{j,i} - \hat x_{j,i} |
+    \label{eq:weighted_mae}
+\end{equation}
+
+\begin{equation}
+    \text{wRMSE} (j) = \frac{1}{| D_{\text{eval}} |} \sum _{d \in D_{\text{eval}}} \sqrt{\frac{1}{| G_{0.25^\circ} |} \sum _{i \in G_h} a_i || x_{j,i} - \hat x_{j,i} ||_2^2}
+    \label{eq:weighted_rmse}
+\end{equation}
+
+\begin{equation}
+    \text{wRMSE}_{\text{trad}} (j) = \sqrt{\frac{1}{| D_{\text{eval}} |} \sum _{d \in D_{\text{eval}}} \frac{1}{| G_{0.25^\circ} |} \sum _{i \in G_h} a_i || x_{j,i} - \hat x_{j,i} ||_2^2}
+    \label{eq:weighted_rmse_trad}
+\end{equation}
+
+
+Figure~\ref{fig:reprojection_error_vs_cr} shows the reconstruction results evaluated in latitude/longitude projection, namely the RMSE, the MAE and the 0.99999 quantile of error for several models. For our target compression ratio of $1000 \times$, we find the hyperprior model to be the strongest performer. Additionally, Figures \ref{fig:error_vs_cr} in the Appendix provides results in HEALPix projection, comparing the various models both on surface and vertical data reconstruction at multiple levels.   
+
+\subsection{Small number of erroneous pixels in reconstructions}
+\label{sx:experiments:bad-pixels}
+
+Figure~\ref{fig:error_histograms} presents a histogram with the distribution of absolute pixelwise reconstruction errors over the entire evaluation set, for three of the vertical variables (temperature, geopotential and zonal wind) and for each elevation level (colour-coded from 50 hPa in blue to 1000 hPa in red). On the top row, corresponding to the hyperprior model, the distributions show sparse tails, with few pixels (0.01\%) reaching high errors of $\pm 4^\circ$~K, $\pm 400~\text{m}^2/\text{s}^2$ or $\pm 6~\text{m}/\text{s}$.
+
+Tables~\ref{tab:percent_bad_pixels_hyper} (for the hyperprior model) and Table \ref{tab:percent_bad_cells_vqvae} (for the VQ-VAE with 3 downsampling blocks) quantify these ``bad pixels'', showing that only 0.5\% pixels at most have absolute errors exceeding 1$^\circ$~K (temperature) or 1 $\text{m}/\text{s}$ (zonal and meridional wind speeds) across all pressure levels.
+
+Because only a few pixels exceed this maximum error threshold, we can trivially cap the maximum error by storing the original uncompressed values of these ``bad pixels'' in a list, to be stored alongside the compressed representation. When reconstructing the image, we overwrite the bad pixels using their original values, reducing their reconstruction error to zero, and capping the maximum error over all reconstructions. The sparsity of bad pixels limits the size of this list, keeping the overall compression ratio low even after accounting for the list's storage cost. The trade-offs of the different strategies for storing this auxiliary information, in terms of compression ratio and distortion characteristics, require further study.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.32\textwidth, trim = 0cm 0cm 1cm 0cm, clip]{figures/experiments/quantiles/errors_Hyperprior_temperature.pdf}
+    \includegraphics[width=0.32\textwidth, trim = 0cm 0cm 1cm 0cm, clip]{figures/experiments/quantiles/errors_Hyperprior_geopotential.pdf}
+    \includegraphics[width=0.32\textwidth, trim = 0cm 0cm 1cm 0cm, clip]{figures/experiments/quantiles/errors_Hyperprior_u_component_of_wind.pdf}
+    \includegraphics[width=0.32\textwidth, trim = 0cm 0cm 1cm 0cm, clip]{figures/experiments/quantiles/errors_3-VQ-VAE_temperature.pdf}
+    \includegraphics[width=0.32\textwidth, trim = 0cm 0cm 1cm 0cm, clip]{figures/experiments/quantiles/errors_3-VQ-VAE_geopotential.pdf}
+    \includegraphics[width=0.32\textwidth, trim = 0cm 0cm 1cm 0cm, clip]{figures/experiments/quantiles/errors_3-VQ-VAE_u_component_of_wind.pdf}
+    \caption{Distribution of signed errors, with the error in the variable units on the X axis and the fraction of pixels in the evaluation set (2010-2023) at that error levels. Top row shows hyperprior results, bottom row shows 3-block VQ-VAE results, with columns corresponding to temperature, geopotential and zonal wind speed. On each plot we show coloured curves for each of the 13 levels in the vertical dataset.}
+    \label{fig:error_histograms}
+\end{figure}
+
+\begin{table}[]
+    \centering
+    \caption{Fraction of pixels with absolute error exceeding given error thresholds, for the hyperprior model with about $1000 \times$ compression ratio.}
+    \begin{tabular}{c|c|c|c}
+        Variable & Error thresh. &\% bad pixels & Compression ratio \\
+        \hline
+        % Temp \@ 2 m &  \todo{X}$^\circ$~K & \todo{Y\%} & \todo{1000} & \todo{500} \\
+        % Surface pressure & \todo{X} hPa & \todo{Y\%} & \todo{1000} & \todo{500} \\
+        % Zonal wind & \todo{X} $\text{m}/\text{s}$ & \todo{Y\%} & \todo{1000} & \todo{500} \\
+        % Meridional wind & \todo{X} $\text{m}/\text{s}$ & \todo{Y\%} & \todo{1000} & \todo{500}
+        Temperature (all levels) & 1$^\circ$~K & 0.5\% & $1059 \times$ \\
+        Zonal wind (all levels) & 1 $\text{m}/\text{s}$ & 0.5\% & $1059 \times$ \\
+        Meridional wind (all levels) & 1 $\text{m}/\text{s}$ & 0.5\% & $1059 \times$ \\
+        Geopotential (all levels) & 100 $\text{m}^2/\text{s}^2$ & 0.05\% & $1059 \times$ \\
+    \end{tabular}
+    
+    \label{tab:percent_bad_pixels_hyper}
+\end{table}
+
+\begin{table}[]
+    \centering
+    \caption{Fraction of pixels with absolute error exceeding given error thresholds, for the 3-block VQ-VAE model with $1100 \times$ compression ratio, and for the 4-block VQ-VAE model with $1800 \times$ compression ratio trained only on geopotential (last row).}
+    \begin{tabular}{c|c|c|c}
+        Variable & Error thresh. & \% bad pixels & Compression ratio \\
+        \hline
+        % Temp \@ 2 m &  \todo{X}$^\circ$~K & \todo{Y\%} & \todo{1000} & \todo{500} \\
+        % Surface pressure & \todo{X} hPa & \todo{Y\%} & \todo{1000} & \todo{500} \\
+        % Zonal wind & \todo{X} $\text{m}/\text{s}$ & \todo{Y\%} & \todo{1000} & \todo{500} \\
+        % Meridional wind & \todo{X} $\text{m}/\text{s}$ & \todo{Y\%} & \todo{1000} & \todo{500}
+        Temperature (all levels) & 1$^\circ$~K & 0.52\% & $1110 \times$ \\
+        Zonal wind (all levels) & 1 $\text{m}/\text{s}$ & 0.51\% & $1110 \times$ \\
+        Meridional wind (all levels) & 1 $\text{m}/\text{s}$ & 0.51\% & $1110 \times$ \\
+        Geopotential (all levels) & 100 $\text{m}^2/\text{s}^2$ & 0.063\% & $1110 \times$ \\
+        \hline
+        Geopotential$^*$ (all levels) & 100 $\text{m}^2/\text{s}^2$ & 0.012\% & $1796 \times$ \\
+    \end{tabular}
+    
+    \label{tab:percent_bad_cells_vqvae}
+\end{table}
+
+
+\subsection{Spectral properties of the reconstructions}
+
+Figure~\ref{fig:spectra} shows the power spectrum density for 4 of the reconstructed variables (temperature, specific humidity, zonal wind and geopotential), with spectra averaged over all equirectangular latitude/longitude frames and over all vertical levels. We notice that some high-frequency information is automatically lost after a round-trip consisting of HEALPix projection from latitude/longitude, spherical harmonic analysis of HEALPix tiles and spherical harmonic synthesis from the spherical harmonics coefficients.
+
+Figure~\ref{fig:spectra} shows that the spectrum of hyperprior reconstructions is closest to the spectrum of ground truth than that of 3-block VQ-VAEs for all variables.
+Appendix~\ref{sx:appendix:spherical_harmonics} details the computation of spherical harmonics on HEALPix tiles, and the extraction of the power spectral density from spherical harmonics coefficients.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth, trim = 5cm 0cm 5cm 0cm, clip]{figures/experiments/spectrum/reprojection_spectra.pdf}
+    \hfill
+    \caption{Power spectrum density for temperature, specific humidity, zonal wind and geopotential, computed using forward spherical harmonics transform. Results are computed on the daily 2016 baseline dataset.}
+    \label{fig:spectra}
+\end{figure}
+
+
+\subsection{Extreme values}
+
+In order to more fully understand the behaviour of these models, we manually select dates corresponding to extrema in temperature, such as Indian heatwave of 2015, and to hurricanes, such as Hurricane Harvey in September 2017 and Hurricane Matthew in October 2016. Figures \ref{fig:hurricane_matthew_hyperprior} and \ref{fig:hurricane_matthew_vqvae} illustrate the performance of the hyperprior and 3-block VQ-VAE models on Hurricane Matthew, and show that geopotential and wind speed information corresponding to the eye of the cyclone is preserved after compression and reconstruction. Figure~\ref{fig:heatwave} illustrates the reconstruction of the temperature at 1000 hPa over 24 hours on 23 May during the 2015 Indian heatwave, and shows that temperature extrema up to around $45^\circ~\text{C}$ are correctly represented.
+
+Appendix~\ref{sx:appendix:hist2d-err-value} contains additional analysis of the reconstruction errors, which suggest that the hyperprior compression model errors are roughly uniformly distributed over the target values, and that the model tends to overestimate higher temperature and wind speed and underestimate lower temperature or wind speed.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth, trim = 6cm 2.5cm 5cm 2cm, clip]{figures/experiments/heatwave/2015_5_23-6_HyperPrior_temperature_zoom_1000hPa.pdf}
+    \includegraphics[width=0.9\textwidth, trim = 6cm 2.5cm 5cm 2cm, clip]{figures/experiments/heatwave/2015_5_23-12_HyperPrior_temperature_zoom_1000hPa.pdf}
+    \includegraphics[width=0.9\textwidth, trim = 6cm 2.5cm 5cm 2cm, clip]{figures/experiments/heatwave/2015_5_23-18_HyperPrior_temperature_zoom_1000hPa.pdf}
+    \includegraphics[width=0.9\textwidth, trim = 6cm 2.5cm 5cm 2cm, clip]{figures/experiments/heatwave/2015_5_24-0_HyperPrior_temperature_zoom_1000hPa.pdf}
+    \hfill
+    \caption{Reconstructions of temperature at 1000 hPa from 2015/5/23 at 6, 12, 18 and 24 UTC (during the 2015 Indian heatwave). Globally, MAE is about $0.47-0.48^\circ~\text{K}$ and most the area of interest is under $1^\circ~\text{K}$ error. The residual show that a few scattered areas near Bhutan or near Karachi have reconstruction over-estimated by about $2-3~^\circ~\text{K}$.}
+    \label{fig:heatwave}
+\end{figure}
+
+\subsection{Comparison with baseline method}
+
+To be able to compare results with \cite{huang2022compressing}, we use the same dataset (described in \cite{ashkboos2022ens}) which contains 11 pressure levels, including 10 of ours and one extra pressure level at 10 hPa. Appendix~\ref{sx:appendix:huangiclr2023} explains how we run their code and establish parity between evaluating on their 11 pressure levels and our 13 pressure levels.
+
+We also define the same subset of data (corresponding to Dataset 2 in \citet{huang2022compressing}), namely 366 daily frames (at 0 UTC) in 2016\footnote{Note that results on Figs. \ref{fig:spectra}, \ref{fig:error_vs_cr} and \ref{fig:reprojection_error_vs_cr_bounded_compression} are computed on the reduced subset of 366 daily frames (at 0 UTC) in 2016.}.
+
+In Figure~\ref{fig:error_vs_cr}, our VQ-VAE, VQ-GAN and hyperprior models achieve significantly lower temperature errors (e.g., $\text{MAE}=0.3^\circ$~K for the $1000 \times$ hyperprior model) than the baseline method. For geopotential, our compression results are marginally better than the baseline ($\text{MAE}=45~\text{m}^2/\text{s}^2$ for the $1000 \times$ hyperprior model, vs. $60~\text{m}^2/\text{s}^2$ for the $1300 \times$ baseline).
+
+Two main observations arise: 1) it is worth investigating single-variable compression of geopotential, similarly in the baseline models (see additional results in Section \ref{sx:discuss:geopotential}), and 2) the baseline method can achieve similar if not better error maxima. We discuss error maxima and provide detailed analysis of the possible origin of the errors in Appendix~\ref{sx:appendix:analysis}.
+
+In concurrent work,~\citet{han2024cra5} demonstrate a neural compressor applied to ERA5 in lat-lon format, with a number of important differences from our own work. While we explore both VQ-VAE and hyperprior networks as candidate models, \citet{han2024cra5} propose a stagewise training method based on a single VQ-VAE network incorporating a window-based attention mechanism to encode the data to latent variables, and another to serve as a hyperprior block to encode first-level variances.
+They validate and test on 2022 and 2023 data respectively, whereas we train on data up to 2010 and evaluate long-term generalisation on 2010-2023.
+They report comparable RMSE to what we report in this work, while that work reports compression ratios of $229-323\times$ compared to the ratios of $1000-3000\times$ that we report.
+%\mkg{Should we go into any more detail about ~\citep{han2024cra5} here? We should add a comparison of their RMSE to ours, using the figures from their table 2. If we wish to be rigorous we could run our evaluator only on 2023 data, the way they do.}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\textwidth, trim = 6cm 0cm 6.5cm 0cm, clip]{figures/experiments/reprojection_stats/reprojection_weighted_rmse_mae_all_temperature.pdf}
+    \includegraphics[width=1\textwidth, trim = 6cm 0cm 6.5cm 0cm, clip]{figures/experiments/reprojection_stats/reprojection_weighted_rmse_mae_all_geopotential.pdf}
+    \includegraphics[width=1\textwidth, trim = 6cm 0cm 6.5cm 0cm, clip]{figures/experiments/reprojection_stats/reprojection_weighted_rmse_mae_all_specific_humidity.pdf}
+    \includegraphics[width=1\textwidth, trim = 6cm 0cm 6.5cm 0cm, clip]{figures/experiments/reprojection_stats/reprojection_weighted_rmse_mae_all_u_component_of_wind.pdf}
+    \hfill
+    \caption{Reconstruction and reprojection error vs. compression ratio, for vertical data, in equirectangular projection. Columns: metrics: respectively root mean squared error (RMSE), mean absolute error (MAE), 0.99999 quantile of error and maximum error over the daily 2016 baseline dataset. Lower errors and higher compression rates are better (bottom right of each plot).}
+    \label{fig:reprojection_error_vs_cr}
+\end{figure}
+
+

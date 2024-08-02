@@ -1,0 +1,13 @@
+\section{Conclusion}
+\label{sx:conclusion}
+
+We propose a method for the neural compression of atmospheric states using the area-preserving HEALPix projection to simplify the processing, by conventional neural networks, of data situated on the sphere. We highlight that this choice of projection allows for efficient computation of spherical harmonics, thereby simplifying both the reprojection of decompressed atmospheric states to latitude/longitude coordinates and straightforward interrogation of the spectral properties of the reconstructions.
+We conduct a detailed analysis of the performance characteristics of several neural compression methods, demonstrating very high compression ratios in excess of $1000\times$ with minimal distortion, while also drawing attention to several shortcomings.
+We find that the hyperprior model, even with a relatively simple encoder and decoder, appears best suited to the task among the models studied.
+Notably, the hyperprior model largely preserves the shape of the power spectrum, despite being trained only via mean squared error and a compressibility penalty.
+We examine performance of the studied compressors on states representing extreme atmospheric events and find that these, too, are well-preserved.
+These results make a compelling case for the viability of neural compression methods in this application domain, while our analysis elucidates trade-offs inherent in our approach, as well as practical considerations surrounding the design of error-bounded compression systems atop these methods.
+
+%Ongoing work focuses on open-sourcing the code and model weights of the hyperprior model, as well as on releasing compressed versions of several climate datasets including (and beyond) ERA5. Because of the representational power of compressed representations, we are also investigating upstream applications of our models for weather and climate forecasting.
+
+%Thanks to careful analysis of the error maxima, we identified the source of high errors in the compression of temperature or geopotential, which was due to localised artefacts in specific humidity at high altitude / low pressure levels (50 hPa or 150 hPa). Our work thus further highlights the ever-present importance of careful data science in the deployment of large-scale deep learning models, and advocates for the use of multiple complementary metrics \citep{ravuri2021nowcasting} to assess the quality of models with applications to weather and climate modeling.

@@ -1,0 +1,43 @@
+\documentclass{article}
+
+\usepackage{iclr2024_conference,times}
+\iclrfinalcopy
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{algorithmicx}
+\usepackage[utf8]{inputenc} %
+\usepackage[T1]{fontenc}    %
+\input{cmd}
+\usepackage{thmtools,thm-restate}
+\usepackage{pbox}
+\usepackage{caption}
+\title{Improved Techniques for Training \\Consistency Models}
+
+
+\author{%
+  Yang Song \& Prafulla Dhariwal\\
+  OpenAI\\
+  \texttt{\{songyang,prafulla\}@openai.com}
+}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+
+\begin{document}
+
+\maketitle
+\input{abs}
+\input{intro}
+\input{background}
+\input{method}
+\input{experiments}
+\input{conclusion}
+
+\bibliography{main.bib}
+\bibliographystyle{iclr2024_conference}
+
+\appendix
+\newpage
+\input{appendix}
+\end{document}

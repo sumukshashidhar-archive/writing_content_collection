@@ -1,0 +1,23 @@
+\ifpreprint
+\clearpage % to make sure it shows up on its own page
+\section{Contributions}
+\label{sec:contributions}
+
+\textbf{Leo Gao} implemented the autoencoder training codebase and basic infrastructure for GPT-4 experiments.  Leo worked on the systems, including kernels, parallelism, numerics, data processing, etc.  Leo conducted most scaling and architecture experiments:  TopK and AuxK, tied initialization, number of latents, subject model size, batch size, token budget, optimal lr, $L(C)$, $L(N)$, random data, etc., and iterated on many other architecture and algorithmic choices. Leo designed and iterated on the probe based metric. Leo did investigations into downstream loss, feature recall/precision, and some early explorations into circuit sparsity.
+
+\textbf{Tom Dupr\'e la Tour} studied activation shrinkage, progressive recovery, and Multi-TopK.  Tom implemented and trained the Gated and ProLU baselines, and trained and analyzed different layers and locations in GPT-2 small.  Tom helped refine the scaling laws for $L(N, K)$ and $L_s(N)$.  Tom discovered the latent sub-spaces (refining an idea and code originally from Carroll Wainwright).
+
+\textbf{Henk Tillman} worked on N2G explanations and LM-based explainer scoring. Henk worked on infrastructure for scraping activations. Henk worked on finding qualitatively interesting features, including safety-related features.
+
+\textbf{Jeff Wu} studied ablation effects and sparsity, and ablation reconstruction.  Jeff managed infrastructure for metrics, and wrote the visualizer data collation and website code.  Jeff analyzed overall cost of having a fully sparse bottleneck, and analyzed recurring dense features.  Cathy and Jeff worked on finding safety-relevant features using attribution.  Jeff managed core researchers on the project. 
+
+\textbf{Gabriel Goh} suggested using TopK, and contributed intuitions about TopK, AuxK, and optimization.  
+
+\textbf{Rajan Troll} contributed intuitions about and advised on optimization, scaling, and systems.
+
+
+\textbf{Alec Radford} suggested using the irreducible loss term and contributed intuitions about and advised on the probe based metric, optimization, and scaling.
+
+\textbf{Jan Leike} and \textbf{Ilya Sutskever} managed and led the Superalignment team. % Without their support, the project wouldn't have happened.
+
+\fi

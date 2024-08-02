@@ -1,0 +1,279 @@
+
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/fig_gpt2sm_L8_relu_vs_topk_probe_vs_L0.png}
+    \caption{TopK beats ReLU not only on the sparsity-MSE frontier, but also on the sparsity-probe loss frontier. (lower is better)}
+    \label{fig:relu_vs_topk_probe}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/fig_gpt2sm_L8_relu_vs_topk_n2g_f1_vs_L0.png}
+    \includegraphics[width=0.45\textwidth]{figures/fig_gpt2sm_L8_relu_vs_topk_n2g_recall_vs_L0.png}
+    \includegraphics[width=0.45\textwidth]{figures/fig_gpt2sm_L8_relu_vs_topk_n2g_precision_vs_L0.png}
+    \caption{TopK beats ReLU on N2G F1 score.  Its N2G explanations have noticeably higher recall, but worse precision. (higher is better)}
+    \label{fig:relu_vs_topk_n2g}
+\end{figure}
+
+
+\begin{figure*}[t!]
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[height=1.5in]{figures/fig_gpt2sm_L8sweepnk_n2g_recall.png}
+        \caption{Recall of N2G explanations\\$P(\text{n2g}>0 | \text{act}>0)$}
+        \label{fig:metric_grids_n2g_recall}
+    \end{subfigure}%
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[height=1.5in]{figures/fig_gpt2sm_L8sweepnk_n2g_precision.png}
+        \caption{Precision of N2G explanations\\$P(\text{act}>0 | \text{n2g}>0)$}
+        \label{fig:metric_grids_n2g_precision}
+    \end{subfigure}
+    \caption{Neuron2graph precision and recall.  The average autoencoder latent is generally easier to explain as $k$ decreases and $n$ increases.  However, $n=2048,k=512$ latents are easy to explain since many latents activate extremely densely (see \autoref{sec:dense_solutions}). 
+}
+    \label{fig:metric_grids_n2g}
+\end{figure*}
+
+
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/fig_lofn_16M.png}
+    \caption{The $L(N)$ scaling law, including the best 16M checkpoint, which we did not have time to train to the $L(N)$ token budget due to compute constraints.}
+    \label{fig:gpt4-n-scaling}
+\end{figure}
+
+
+
+
+
+
+
+
+\section{Miscellaneous small results}
+
+
+\subsection{Impact of different locations}
+\label{sec:layer_location_impact}
+
+In a sweep across locations in GPT-2 small, we found that the optimal learning rate varies with layer and location type (MLP delta, attention delta, MLP post, attention post), but was within a factor of two.
+
+Number of tokens needed for convergence is noticeably higher for earlier layers.  MSE is lowest at early layers of the residual stream, increasing until the final layer, at which point it drops.  Residual stream deltas have MSE peaking around layer 6, with attention delta falling sharply at the final layer.  %
+
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.45\textwidth]{placeholders/fig_gpt2sm_sweeploc_downstream_nmse_vs_loss_diff.png}
+    \includegraphics[width=0.45\textwidth]{placeholders/fig_gpt2sm_sweeploc_downstream_nmse_vs_loss_diff_first.png}
+    \caption{\textbf{(a)} Normalized MSE gets worse later in the network, with the exception of the last two layers, where it improves.  Later layers suffer worse loss differences when ablating to reconstruction, even at the final two layers. \textbf{(b)} First position token loss is more severely affected by ablation than other layers despite having lower normalized MSE.  Overall loss difference has no clear relation with normalized MSE across layers.  In very early layers and the final layer, where residual stream norm is also more normal (\autoref{fig:norm_by_token}), we see a more typical loss difference and MSE. This is consistent with the hypothesis that the large norm component of the first token is primarily to serve attention operations at later tokens.
+    }
+    \label{fig:mse_vs_downstream_loss_layers}
+\end{figure}
+
+When ablating to reconstructions, downstream loss and KL get strictly worse with layer.  This is despite normalized MSE dropping at late layers.  However, there appears to be an exception at final layers (layer 11/12 and especially 12/12 of GPT-2 small), which can have better normalized MSE than earlier layers, but more severe effects on downstream prediction (\autoref{fig:mse_vs_downstream_loss_layers}).
+
+
+We can also see that choice of layer affects different metrics differently (\autoref{fig:metric_grids_by_loc}).  While earlier layers (unsurprisingly) have better N2G explanations, later layers do better on probe loss and sparsity.
+
+
+In early results with autoencoders trained on the last layer of GPT-2 small, we found the results to be qualitatively worse than the layer 8 results, so we use layer 8 for all experiments going forwards.
+
+\begin{figure*}[t!]
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[height=0.6in]{figures/fig_gpt2sm_sweeploc_n2g_recall.png}
+        \caption{Recall of N2G explanations\\$P(\text{n2g}>0 | \text{act}>0)$}
+        \label{fig:metric_grids_n2g_recall_by_loc}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[height=0.6in]{figures/fig_gpt2sm_sweeploc_n2g_precision.png}
+        \caption{Precision of N2G explanations\\$P(\text{act}>0 | \text{n2g}>0)$}
+        \label{fig:metric_grids_n2g_precision_by_loc}
+    \end{subfigure}
+
+
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[height=0.6in]{figures/fig_gpt2sm_sweeploc_probe_grid.png}
+        \caption{Probe loss}
+        \label{fig:metric_grids_probe_by_loc}
+    \end{subfigure}%
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[height=0.6in]{figures/fig_gpt2sm_sweeploc_ablatevote_sparsity_l1l2.png}
+        \caption{Logit diff sparsity}
+        \label{fig:metric_grids_sparsity_by_loc}
+    \end{subfigure}
+    \caption{Metrics as a function of layer, for GPT-2 small autoencoders with $k=32$ and $n=32768$.  Earlier layers are easier to explain in terms of token patterns, but later layers are better for recovering features and have sparser logit diffs.
+    }
+    \label{fig:metric_grids_by_loc}
+
+
+\end{figure*}
+
+
+
+\subsection{Impact of token position}
+\label{sec:token_position}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{placeholders/fig_gpt2sm_downstream_nmse_by_token.png}
+    \caption{Later tokens are more difficult to reconstruct. (lower is better) }
+    \label{fig:mse_by_token_index}
+\end{figure}
+
+We find that tokens at later positions are harder to reconstruct (\autoref{fig:mse_by_token_index}).  We hypothesize that this is because the residual stream at later positions have more features.  First positions are particularly egregiously easy to reconstruct, in terms of normalized MSE, but they also generally have residual stream norm more than an order of magnitude larger than other positions ( \autoref{fig:norm_by_token} shows that in GPT-2 small, the exception is only at early layers and the final layer of GPT-2 small).  This phenomenon was explained in \citep{sun2024massive,xiao2023efficient}, which demonstrate that these activations serve as crucial attention resting states.
+
+
+
+First token positions have significantly worse downstream loss and KL after ablating to autoencoder reconstruction at layers with these large norms (\autoref{fig:mse_vs_downstream_loss_layers}), despite having better normalized MSE.  %
+This is consistent with the hypothesis that the large norm directions at the first position are important for loss on other tokens but not the current token.  This position then potentially gets subtracted back out at the final layer as the model focuses on current-token prediction.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/fig_gpt2sm_norm_per_tok.png}
+    \caption{Residual stream norms by context position.  First token positions are more than an order of magnitude larger than other positions, except at the first and last layer for GPT-2 small.}
+    \label{fig:norm_by_token}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Irreducible loss term}\label{sec:random-data-aes}
+
+
+In language models, the irreducible loss exists because text has some intrinsic unpredictableness---even with a perfect language model, the loss of predicting the next token cannot be zero.
+Since an arbitrarily large autoencoder can in fact perfectly reconstruct the input, we initially expected there to be no irreducible loss term. However, we found the quality of the fit to be substantially less good without an irreducible loss.
+
+While we don't fully understand the reason behind the irreducible loss term, our hypothesis is that the activations are made of a spectrum of components with different amount of structure. We expect less strucutured data to also have a worse scaling exponent. At the most extreme, some amount of the activations could be completely unstructured gaussian noise. In synthetic experiments with unstructured noise (see \autoref{fig:random-data-scaling}), we find an $L(N)$ exponent of -0.04 on 768-dimensional gaussian data, which is much shallower than the approximately -0.26 we see on GPT-2-small activations of a similar dimensionality.
+
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/fig_random_scaling.png}
+    \caption{L(N) scaling law for training on 768-dimensional random gaussian data with k=32}
+    \label{fig:random-data-scaling}
+\end{figure}
+
+
+
+
+
+
+\section{Further probe based evaluations results}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/fig_probe_through_training.png}
+    \caption{Probe eval scores through training for 128k, 1M, and 16M autoencoders. The baseline score of using the channels of the residual stream directly is 0.600.}
+    \label{fig:probes-over-training}
+\end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/fig_probe_breakdown_by_task_zeronorm.png}
+    \caption{Probe eval scores for the 16M autoencoder starting at the point where probe features start developing (around 10B tokens elapsed).}
+    \label{fig:probes-training-breakdown}
+\end{figure}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_probe_breakdown_by_task.png}
+    \caption{Probe eval scores for the 16M autoencoder broken down by task. Some lines (europarl, bigrams, occupations, ag\_news) are aggregations of multiple tasks.}
+    \label{fig:probes-by-task}
+\end{figure}
+
+\begin{table}[!ht]
+\thisfloatpagestyle{empty}
+\centering
+\caption{Tasks used in the probe-based evaluation suite}
+\label{table:probe-eval}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Task Name} & \textbf{Details} \\ \hline
+amazon & \citet{mcauley2013hidden} \\ \hline
+sciq &  \citet{welbl2017sciq} \\ \hline
+truthfulqa & \citet{lin2021truthfulqa} \\ \hline
+mc\_taco & \citet{zhou2019mctaco} \\ \hline
+piqa & \citet{Bisk2020} \\ \hline
+quail & \citet{rogers2020getting} \\ \hline
+quartz & \citet{tafjord2019quartz} \\ \hline
+justice & \multirow{4}{*}{\citet{hendrycks2020aligning}} \\ \cline{1-1}
+virtue & \\ \cline{1-1}
+utilitarianism & \\ \cline{1-1}
+deontology & \\ \hline
+commonsense\_qa &  \citet{talmor2022commonsenseqa} \\ \hline
+openbookqa & \citet{OpenBookQA2018} \\ \hline
+base64 & discrimination of base64 vs pretraining data \\ \hline
+wikidata\_isalive & \multirow{25}{*}{\citet{gurnee2023finding}} \\ \cline{1-1}
+wikidata\_sex\_or\_gender & \\ \cline{1-1}
+wikidata\_occupation\_isjournalist & \\ \cline{1-1}
+wikidata\_occupation\_isathlete & \\ \cline{1-1}
+wikidata\_occupation\_isactor & \\ \cline{1-1}
+wikidata\_occupation\_ispolitician & \\ \cline{1-1}
+wikidata\_occupation\_issinger & \\ \cline{1-1}
+wikidata\_occupation\_isresearcher & \\ \cline{1-1}
+phrase\_high-school & \\ \cline{1-1}
+phrase\_living-room & \\ \cline{1-1}
+phrase\_social-security & \\ \cline{1-1}
+phrase\_credit-card & \\ \cline{1-1}
+phrase\_blood-pressure & \\ \cline{1-1}
+phrase\_prime-factors & \\ \cline{1-1}
+phrase\_social-media & \\ \cline{1-1}
+phrase\_gene-expression & \\ \cline{1-1}
+phrase\_control-group & \\ \cline{1-1}
+phrase\_magnetic-field & \\ \cline{1-1}
+phrase\_cell-lines & \\ \cline{1-1}
+phrase\_trial-court & \\ \cline{1-1}
+phrase\_second-derivative & \\ \cline{1-1}
+phrase\_north-america & \\ \cline{1-1}
+phrase\_human-rights & \\ \cline{1-1}
+phrase\_side-effects & \\ \cline{1-1}
+phrase\_public-health & \\ \cline{1-1}
+phrase\_federal-government & \\ \cline{1-1}
+phrase\_third-party & \\ \cline{1-1}
+phrase\_clinical-trials & \\ \cline{1-1}
+phrase\_mental-health & \\ \hline
+social\_iqa &  \citet{sap2019socialiqa}  \\ \hline
+wic & \multirow{2}{*}{\citet{wang2018glue}} \\ \cline{1-1}
+cola & \\ \hline
+gpt2disc & \citet{gpt2_output_dataset} \\ \hline
+ag\_news\_world & \multirow{4}{*}{\citet{gulli_ag_news}} \\ \cline{1-1}
+ag\_news\_sports & \\ \cline{1-1}
+ag\_news\_business & \\ \cline{1-1}
+ag\_news\_scitech & \\ \hline
+europarl\_es & \multirow{8}{*}{\citet{koehn-2005-europarl}} \\ \cline{1-1}
+europarl\_en & \\ \cline{1-1}
+europarl\_fr & \\ \cline{1-1}
+europarl\_nl & \\ \cline{1-1}
+europarl\_it & \\ \cline{1-1}
+europarl\_el & \\ \cline{1-1}
+europarl\_de & \\ \cline{1-1}
+europarl\_pt & \\ \cline{1-1}
+europarl\_sv & \\ \hline
+jigsaw & \citet{jigsaw2017} \\ \hline
+\end{tabular}
+\end{table}
+

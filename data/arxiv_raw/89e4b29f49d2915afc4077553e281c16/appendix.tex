@@ -1,0 +1,167 @@
+\section{Proofs}\label{app:proof}
+\begin{customprop}{\ref{prop}}
+    Given the notations introduced in \cref{sec:noema}, and using the uniform weighting function $\lambda(\sigma) = 1$ along with the squared $\ell_2$ metric, we have
+    \begin{gather}
+        \lim_{N \to \infty}\mcal{L}^N(\theta, \theta^-) = \lim_{N \to \infty}\mcal{L}^N_\text{CT}(\theta, \theta^-) = \mbb{E}\Big[ \big(1 - \frac{\sigma_\text{min}}{\sigma_i} \big)^2(\theta - \theta^{-})^2\Big] \quad \text{if $\theta^{-}\neq \theta$}\\
+        \lim_{N \to \infty}\frac{1}{\Delta \sigma} \frac{\ud \mcal{L}^N(\theta, \theta^{-})}{\ud \theta} = \begin{cases}
+            \frac{\ud}{\ud\theta} \mbb{E}\Big[ \frac{\sigma_\text{min}}{\sigma_i^2}\Big( 1 - \frac{\sigma_\text{min}}{\sigma_i} \Big)(\theta - \xi)^2 \Big], &\quad \theta^{-} = \theta\\
+            +\infty, &\quad \theta^{-} < \theta \\
+            -\infty, &\quad \theta^{-} > \theta \\
+        \end{cases}
+    \end{gather}
+\end{customprop}
+\begin{proof}
+Since $\lambda(\sigma) \equiv 1$ and $d(x, y) = (x-y)^2$, we can write down the CM and CT objectives as
+$\mcal{L}^{N}(\theta, \theta^{-}) = \mbb{E}[(f_\theta(x_{\sigma_{i+1}}, \sigma_{i+1}) - f_{\theta^-}(\breve{x}_{\sigma_i}, \sigma_i))^2]$ and $\mcal{L}^{N}_\text{CT}(\theta, \theta^{-}) = \mbb{E}[(f_\theta(x_{\sigma_{i+1}}, \sigma_{i+1}) - f_{\theta^-}(\check{x}_{\sigma_i}, \sigma_i))^2]$ respectively. Since $p_\text{data}(x) = \delta(x - \xi)$, we have $p_\sigma(x) = \mcal{N}(x\mid \xi, \sigma^2)$, and therefore $\nabla \log p_\sigma(x) = -\frac{x - \xi}{\sigma^2}$. According to the definition of $\breve{x}_{\sigma_i}$ and $x_{\sigma_{i+1}} = \xi + \sigma_{i+1}z$, we have
+\begin{align*}
+    \breve{x}_{\sigma_i} &= x_{\sigma_{i+1}} - (\sigma_i - \sigma_{i+1})\sigma_{i+1}\nabla \log p(x_{\sigma_{i+1}}, \sigma_{i+1})\\
+    &=x_{\sigma_{i+1}} + (\sigma_i - \sigma_{i+1})\sigma_{i+1}\frac{x_{\sigma_{i+1}} - \xi}{\sigma_{i+1}^2}\\
+    &=x_{\sigma_{i+1}} + (\sigma_i - \sigma_{i+1})z\\
+    &=\xi + \sigma_{i+1}z + (\sigma_i - \sigma_{i+1})z\\
+    &=\xi + \sigma_iz\\
+    &=\check{x}_{\sigma_i}.
+\end{align*}
+As a result, the CM and CT objectives are exactly the same, that is, $\mcal{L}^N(\theta, \theta^-) = \mcal{L}^N_\text{CT}(\theta, \theta^-)$. Recall that the consistency model $f_\theta(x, \sigma)$ is defined as $f_\theta(x, \sigma) = \frac{\sigma_\text{min}}{\sigma} x + \left(1 - \frac{\sigma_\text{min}}{\sigma} \right)\theta$, so we have $f_\theta(x_{\sigma}, \sigma) = \sigma_\text{min} z + \frac{\sigma_\text{min}}{\sigma}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma}\right)\theta$.
+Now, let us focus on the CM objective
+\begin{align*}
+    \mcal{L}^N(\theta, \theta^-) &= \mbb{E}[(f_\theta(x_{\sigma_{i+1}}, \sigma_{i+1}) - f_{\theta^-}(\breve{x}_{\sigma_i}, \sigma_i))^2]\\
+    &=\mbb{E}[(f_\theta(x_{\sigma_{i+1}}, \sigma_{i+1}) - f_{\theta^-}(\check{x}_{\sigma_i}, \sigma_i))^2]\\
+    &=\mbb{E}\bigg[\bigg(\frac{\sigma_\text{min}}{\sigma_{i+1}}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_{i+1}}\right)\theta - \frac{\sigma_\text{min}}{\sigma_i}\xi - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg)^2\bigg]\\
+    &=\mbb{E}\bigg[\bigg(\frac{\sigma_\text{min}}{\sigma_i + \Delta \sigma}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_i + \Delta \sigma}\right)\theta - \frac{\sigma_\text{min}}{\sigma_i}\xi - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg)^2\bigg],
+\end{align*}
+where $\Delta \sigma = \frac{\sigma_\text{max} - \sigma_\text{min}}{N-1}$, because $\sigma_i = \sigma_\text{min} + \frac{i-1}{N-1}(\sigma_\text{max} - \sigma_\text{min})$. By taking the limit $N \to \infty$, we have $\Delta \sigma \to 0$, and therefore
+\begin{align*}
+    &\lim_{N\to\infty} \mcal{L}^N(\theta, \theta^-) \\
+    =& \lim_{\Delta \sigma \to 0} \mbb{E}\bigg[\bigg(\frac{\sigma_\text{min}}{\sigma_i + \Delta \sigma}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_i + \Delta \sigma}\right)\theta - \frac{\sigma_\text{min}}{\sigma_i}\xi - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg)^2\bigg]\\
+    =& \lim_{\Delta \sigma \to 0} \mbb{E}\bigg[\bigg(\frac{\sigma_\text{min}}{\sigma_i}\left(1 - \frac{\Delta \sigma}{\sigma_i}\right)\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_i + \Delta \sigma}\right)\theta - \frac{\sigma_\text{min}}{\sigma_i}\xi - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg)^2\bigg] + o(\Delta \sigma)\\
+    =&\lim_{\Delta \sigma \to 0} \mbb{E}\bigg[\bigg(-\frac{\sigma_\text{min}\Delta \sigma}{\sigma_i^2}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_i + \Delta \sigma}\right)\theta - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg)^2\bigg] + o(\Delta \sigma)\\
+    =&\lim_{\Delta \sigma \to 0} \mbb{E}\bigg[\bigg(-\frac{\sigma_\text{min}\Delta \sigma}{\sigma_i^2}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\left(1 - \frac{\Delta \sigma}{\sigma_i}\right)\right)\theta - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg)^2\bigg] + o(\Delta \sigma).
+\end{align*}
+Suppose $\theta^{-}\neq \theta$, we have
+\begin{align*}
+    &\lim_{N\to\infty} \mcal{L}^N(\theta, \theta^-) \\
+    =&\lim_{\Delta \sigma \to 0} \mbb{E}\bigg[\bigg(-\frac{\sigma_\text{min}\Delta \sigma}{\sigma_i^2}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\left(1 - \frac{\Delta \sigma}{\sigma_i}\right)\right)\theta - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg)^2\bigg] + o(\Delta \sigma)\\
+    =&\lim_{\Delta \sigma \to 0} \mbb{E}\Big[ \big(1 - \frac{\sigma_\text{min}}{\sigma_i} \big)^2(\theta - \theta^{-})^2\Big]  + o(\Delta \sigma)\\
+    =&\mbb{E}\Big[ \big(1 - \frac{\sigma_\text{min}}{\sigma_i} \big)^2(\theta - \theta^{-})^2\Big],
+\end{align*}
+which proves our first statement in the proposition.
+
+Now, let's consider $\nabla_\theta \mcal{L}^N(\theta, \theta^-)$. It has the following form
+\begin{align*}
+    \nabla_\theta \mcal{L}^N(\theta, \theta^{-}) = 2\mbb{E}\bigg[\bigg(\frac{\sigma_\text{min}}{\sigma_{i+1}}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_{i+1}}\right)\theta - \frac{\sigma_\text{min}}{\sigma_i}\xi - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg)\left(1 - \frac{\sigma_\text{min}}{\sigma_{i+1}}\right)\bigg].
+\end{align*}
+As $N\to\infty$ and $\Delta \sigma \to 0$, we have
+\begin{align}
+    &\lim_{N\to\infty}\nabla_\theta \mcal{L}^N(\theta, \theta^{-}) \notag\\
+    =& \lim_{\Delta \sigma \to 0} 2\mbb{E}\bigg[-\frac{\sigma_\text{min}\Delta \sigma}{\sigma_i^2}\xi + \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\left(1 - \frac{\Delta \sigma}{\sigma_i}\right)\right)\theta - \left(1 - \frac{\sigma_\text{min}}{\sigma_i}\right)\theta^-\bigg]\left(1 - \frac{\sigma_\text{min}}{\sigma_{i}}\right)\notag\\
+    =& \begin{cases}
+        \lim_{\Delta \sigma \to 0} 2\mbb{E}\Big[-\frac{\sigma_\text{min}\Delta \sigma}{\sigma_i^2}\xi + \frac{\sigma_\text{min}\Delta \sigma}{\sigma_i^2}\theta \Big]\left(1 - \frac{\sigma_\text{min}}{\sigma_{i}}\right),\quad & \theta^- = \theta\\
+        2\mbb{E}\Big[ \big(1 - \frac{\sigma_\text{min}}{\sigma} \big)^2(\theta - \theta^{-})\Big], \quad &\theta^- \neq \theta
+    \end{cases}\notag\\
+    =& \begin{cases}
+        \lim_{\Delta \sigma \to 0} 2\mbb{E}\Big[\frac{\sigma_\text{min}\Delta \sigma}{\sigma_i^2}(\theta - \xi) \Big]\left(1 - \frac{\sigma_\text{min}}{\sigma_{i}}\right),\quad & \theta^- = \theta\\
+        2\mbb{E}\Big[ \big(1 - \frac{\sigma_\text{min}}{\sigma_i} \big)^2(\theta - \theta^{-})\Big], \quad &\theta^- \neq \theta.\label{eq:key}
+    \end{cases}
+\end{align}
+Now it becomes obvious from \cref{eq:key} that when $\theta^- = \theta$, we have
+\begin{align*}
+    \lim_{N\to\infty}\frac{1}{\Delta \sigma} \nabla_\theta \mcal{L}^N(\theta, \theta^{-}) &= \lim_{\Delta \sigma \to 0} 2\mbb{E}\Big[\frac{\sigma_\text{min}}{\sigma_i^2}(\theta - \xi) \Big]\left(1 - \frac{\sigma_\text{min}}{\sigma_{i}}\right)\\
+    &=  2\mbb{E}\Big[\frac{\sigma_\text{min}}{\sigma_i^2}(\theta - \xi) \Big]\left(1 - \frac{\sigma_\text{min}}{\sigma_{i}}\right)\\
+    &=\frac{\ud}{\ud\theta} \mbb{E}\Big[ \frac{\sigma_\text{min}}{\sigma_i^2}\Big( 1 - \frac{\sigma_\text{min}}{\sigma_i} \Big)(\theta - \xi)^2 \Big].
+\end{align*}
+Moreover, we can deduce from \cref{eq:key} that
+\begin{align*}
+    \lim_{N\to\infty}\frac{1}{\Delta \sigma} \nabla_\theta \mcal{L}^N(\theta, \theta^{-}) = \begin{cases}
+        +\infty, \quad \theta > \theta^-\\
+        -\infty, \quad \theta < \theta^-
+    \end{cases},
+\end{align*}
+which concludes the proof.
+\end{proof}
+
+\section{Additional experimental details and results}\label{app:exp}
+
+\paragraph{Model architecture} Unless otherwise noted, we use the NCSN++ architecture \citep{song2021scorebased} on CIFAR-10, and the ADM architecture \citep{dhariwal2021diffusion} on ImageNet $64\times 64$. For iCT-deep models in \cref{tab:cifar-10,tab:imagenet-64}, we double the depth of base architectures by increasing the number of residual blocks per resolution from 4 and 3 to 8 and 6 for CIFAR-10 and ImageNet $64\times 64$ respectively. We use a dropout rate of 0.3 for all consistency models on CIFAR-10. For ImageNet $64\times 64$, we use a dropout rate of 0.2, but only apply them to convolutional layers whose the feature map resolution is smaller or equal to $16\times 16$, following the configuration in \citet{hoogeboom2023simple}. We also found that AdaGN introduced in \citet{dhariwal2021diffusion} hurts consistency training and opt to remove it for our ImageNet $64\times 64$ experiments. All models on CIFAR-10 are unconditional, and all models on ImageNet $64\times 64$ are conditioned on class labels.
+
+\paragraph{Training} We train all models with the RAdam optimizer \citep{liu2019variance} using learning rate 0.0001. All CIFAR-10 models are trained for 400,000 iterations, whereas ImageNet $64\times 64$ models are trained for 800,000 iterations. For CIFAR-10 models in \cref{sec:method}, we use batch size 512 and EMA decay rate 0.9999 for the student network. For iCT and iCT-deep models in \cref{tab:cifar-10}, we use batch size 1024 and EMA decay rate of 0.99993 for CIFAR-10 models, and batch size 4096 and EMA decay rate 0.99997 for ImageNet $64\times 64$ models. All models are trained on a cluster of Nvidia A100 GPUs.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/pseudo_huber.png}
+        \caption{$d(\bm{0}, \vx)$ as a function of $\vx$.}\label{fig:pseudo_huber_shape}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/adam.png}
+        \caption{Comparing Adam updates.}\label{fig:adam}
+    \end{subfigure}
+    \caption{(a) The shapes of various metric functions. (b) The $\ell_2$ norms of parameter updates in Adam optimizer. Curves are rescaled to have the same mean. The Pseudo-Huber metric has lower variance compared to the squared $\ell_2$ metric.}
+    \label{fig:pseudo_huber}
+\end{figure}
+
+\paragraph{Pseudo-Huber losses and variance reduction} In \cref{fig:pseudo_huber}, we provide additional analysis for the Pseudo-Huber metric proposed in \cref{sec:pseudo_huber}. We show the shapes of squared $\ell_2$ metric, as well as Pseudo-Huber losses with various values of $c$ in \cref{fig:pseudo_huber_shape}, illustrating that Pseudo-Huber losses smoothly interpolates between the $\ell_1$ and squared $\ell_2$ metrics. In \cref{fig:adam}, we plot the $\ell_2$ norms of parameter updates retrieved from the Adam optimizer for models trained with squared $\ell_2$ and Pseudo-Huber metrics. We observe that the Pseudo-Huber metric has lower variance compared to the squared $\ell_2$ metric, which is consistent with our hypothesis in \cref{sec:pseudo_huber}.
+
+\paragraph{Samples}
+We provide additional uncurated samples from iCT and iCT-deep models on both CIFAR-10 and ImageNet $64\times 64$. See \cref{fig:cifar10_ict,fig:cifar10_ict_deep,fig:imagenet_ict,fig:imagenet_ict_deep}. For two-step sampling, the intermediate noise level $\sigma_{i_2}$ is 0.821 for CIFAR-10 and 1.526 for ImageNet $64\times 64$ when using iCT. When employing iCT-deep, $\sigma_{i_2}$ is 0.661 for CIFAR-10 and 0.973 for ImageNet $64\times 64$.
+
+\newpage
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{\textwidth}
+        \includegraphics[width=\textwidth]{figures/cifar10_shallow.png}
+        \caption{One-step samples from the iCT model on CIFAR-10 (FID = 2.83).}
+    \end{subfigure}\\
+    \vspace{2em}
+    \begin{subfigure}[b]{\textwidth}
+        \includegraphics[width=\textwidth]{figures/cifar10_2_step_shallow.png}
+        \caption{Two-step samples from the iCT model on CIFAR-10 (FID = 2.46).}
+    \end{subfigure}
+    \caption{Uncurated samples from iCT models on CIFAR-10. All corresponding samples use the same initial noise.}
+    \label{fig:cifar10_ict}
+\end{figure}
+\newpage
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{\textwidth}
+        \includegraphics[width=\textwidth]{figures/cifar10.png}
+        \caption{One-step samples from the iCT-deep model on CIFAR-10 (FID = 2.51).}
+    \end{subfigure}\\
+    \vspace{2em}
+    \begin{subfigure}[b]{\textwidth}
+        \includegraphics[width=\textwidth]{figures/cifar10_2_step.png}
+        \caption{Two-step samples from the iCT-deep model on CIFAR-10 (FID = 2.24).}
+    \end{subfigure}
+    \caption{Uncurated samples from iCT-deep models on CIFAR-10. All corresponding samples use the same initial noise.}
+    \label{fig:cifar10_ict_deep}
+\end{figure}
+\newpage
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{\textwidth}
+        \includegraphics[width=\textwidth]{figures/in64_binary.png}
+        \caption{One-step samples from the iCT model on ImageNet $64\times 64$ (FID = 4.02).}
+    \end{subfigure}\\
+    \begin{subfigure}[b]{\textwidth}
+        \includegraphics[width=\textwidth]{figures/in64_binary_2_step.png}
+        \caption{Two-step samples from the iCT model on ImageNet $64\times 64$ (FID = 3.20).}
+    \end{subfigure}
+    \caption{Uncurated samples from iCT models on ImageNet $64\times 64$. All corresponding samples use the same initial noise.}
+    \label{fig:imagenet_ict}
+\end{figure}
+
+\newpage
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{\textwidth}
+        \includegraphics[width=\textwidth]{figures/in64_binary_deep.png}
+        \caption{One-step samples from the iCT-deep model on ImageNet $64\times 64$ (FID = 3.25).}
+    \end{subfigure}\\
+    \begin{subfigure}[b]{\textwidth}
+        \includegraphics[width=\textwidth]{figures/in64_binary_2_step_deep.png}
+        \caption{Two-step samples from the iCT-deep model on ImageNet $64\times 64$ (FID = 2.77).}
+    \end{subfigure}
+    \caption{Uncurated samples from iCT-deep models on ImageNet $64\times 64$. All corresponding samples use the same initial noise.}
+    \label{fig:imagenet_ict_deep}
+\end{figure}

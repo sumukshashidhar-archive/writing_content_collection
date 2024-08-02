@@ -1,0 +1,15 @@
+\begin{figure}
+    %\centering
+    \begin{flushright}
+    \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_HyperPrior_temperature_850hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_HyperPrior_specific_humidity_1000hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_HyperPrior_u_component_of_wind_1000hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.8cm 5cm 2.8cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_HyperPrior_u_component_of_wind_zoom_1000hPa.pdf}
+    % \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_HyperPrior_geopotential_500hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.8cm 5cm 2.8cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_HyperPrior_geopotential_zoom_500hPa.pdf}
+    \includegraphics[width=0.65\textwidth, trim = 20cm 3.8cm 5cm 2.8cm, clip]{figures/baseline/2016_10_5-0_baseline_512_geopotential_zoom_500hPa.pdf}
+    % \hspace*{-10em}
+    \caption{Hyperprior reconstructions of a global frame on 2016/10/5 at 0 UTC, compressed $1000\times$. From top to bottom: temperature at 850 hPa, specific humidity at 1000 hPa, the zonal component of wind at 1000 hPa (and a zoom over the Caribbean), and geopotential at 500 hPa over the Caribbean. Last row shows reconstruction using \citet{huang2022compressing} compressed $1150\times$ as a baseline. Columns show the ground truth, the reconstruction and the residual along mean absolute error (MAE). Note the improvement in Hurricane Matthew's reconstruction over the baseline.}
+    \label{fig:hurricane_matthew_hyperprior}
+    \end{flushright}
+\end{figure}

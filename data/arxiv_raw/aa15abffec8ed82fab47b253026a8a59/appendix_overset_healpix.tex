@@ -1,0 +1,45 @@
+\subsection{HEALPix projection}
+
+Throughout the paper, we rely on a specific instance of the HEALPix projection that projects the sphere onto 12 diamond-shaped tiles of equal areas: 4 tiles joining at the North Pole and touching the Equator on their opposite corners, 4 equatorial tiles, and 4 tiles joining at the South Pole and touching the Equator. The HEALPix projection is illustrated on Figure \ref{fig:system}.
+
+Each tile can be projected onto a square and subdivided into $2^n \times 2^n$ pixels. In this paper, we choose $2^n = 256$ so that one HEALPix pixel covers an area roughly equivalent to a pixel on the Equator of a lat/lon grid of 721 latitudes by 1440 longitudes.
+The area of a single HEALPix pixel on a sphere of radius $r$ is $4 \pi r^2 / (12 \times 2^n \times 2^n) \approx 1.6 \times 10^{-5} \times r^2$ for $2^n = 256$, whereas the area of a single latitude/longitude cell on a grid of $N_{lat}$ latitudes by $N_{lon}$ longitudes can be approximated to $(2 \pi r)^2 / (N_{lon} \times 2 N_{lat}) \approx 1.9 \times 10^{-5} \times r^2$. While such a HEALPix mesh contains fewer pixels (only $12 \times 2^n \times 2^n = 786,432$) as opposed to the lat/lon grid at 0.25$^\circ$ ($N_{lon} \times N_{lat} = 1,038,240$), the latter cells cover increasingly smaller areas close to the poles.
+
+The coordinates of all pixels in HEALPix tiles are computed using the {\tt astropy\_healpix}\footnote{\url{https://github.com/astropy/astropy-healpix}} Python software library. Projection from the lat/lon grid onto pixel coordinates of individual HEALPix tiles is done using bilinear interpolation over a grid $(\cos(\theta), \phi)$ of cosines of latitudes $\theta$ and longitudes $\phi$.
+
+For reprojecting back from HEALPix to lat/lon coordinates, and while we could have used bilinear interpolation on individual HEALPix tiles' square grids, or inverse distance interpolation on triangles from the 3D mesh of HEALPix coordinates, we use spherical harmonics synthesis instead, as described in Appendix \ref{sx:appendix:spherical_harmonics}.
+
+\subsection{Stitching artefacts due to combining different HEALPix reconstructions}
+
+Our image compression models are trained to compress and reconstruct HEALPix tiles independently. As a consequence, small discontinuities can appear at the edges of each reconstructed HEALPix tile, and become apparent when neighboring HEALPix tiles are ``stitched'' together on the reprojected lat/lon image, as exemplified on Figure \ref{fig:stitching}. We hypothesize that discontinuities appear because at the edges of each HEALPix tile, the model misses contextual information from beyond each HEALPix tile.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.495\textwidth]{figures/experiments/healpix/Reconstruction_Artefact.png}
+    \includegraphics[width=0.495\textwidth]{figures/experiments/healpix/Reconstruction_Artefact_Error.png}
+    \hfill
+    \caption{Example of ``stitching'' artefact due to reconstructing HEALPix tiles independently. The left image shows temperature at 2m after reconstruction in HEALPix projection space and reprojection back to lat/lon coordinates. The right image shows the difference between reconstruction and ground truth, making apparent that artefacts appear along the ``seamlines'' of different HEALPix tiles (highlighted in red ovals on the figure).}
+    \label{fig:stitching}
+\end{figure}
+
+\subsection{HEALPix tiles extended with padding}
+
+To address the problem of discontinuites and stitching artefacts, we propose to learn image compression and reconstruction using overset HEALPix meshes and in extended image space, by going from $288 \times 288$ input images ($288 = 256 + 16 + 16$, i.e., 256 plus 16 padding borders on each side of the tile) to $288 \times 288$ output images. These resulting input, target and output images correspond to \emph{padded} HEALPix tiles.
+
+Padding HEALPix tiles is complicated by the fact that some corners of HEALPix tiles are at the intersection of 4 tiles (the junctions at the Equator, and at the North and South Pole), whereas other corners are at the intersection of 3 tiles (the junction at $\pm 45^\circ$ latitude). \citet{karlbauer2023advancing} discuss padding HEALPix tiles by copying pixel values from neighbouring tiles (see Figure A2 in their paper) but their proposal relies on mirror-padding the polar tiles at the 3-tile junctions. Unlike their approach, ours preserves local angles by relying on interpolation instead and does not involve mirror-padding.
+
+Figure \ref{fig:overset} illustrates how we extend the $256 \times 256$ HEALPix tiles with extra padding of 16 pixels on each side. Note that unlike HEALPix coordinates, there is no closed form calculation for this padding; instead, we use extrapolation of HEALPix corners and interpolation between two such extrapolated corners to obtain a new $288 \times 288$ grid.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.24\textwidth]{figures/experiments/healpix/Healpix_red.png}
+    \includegraphics[width=0.24\textwidth]{figures/experiments/healpix/Healpix_green.png}
+    \includegraphics[width=0.24\textwidth]{figures/experiments/healpix/Healpix_blue.png}
+    \includegraphics[width=0.24\textwidth]{figures/experiments/healpix/Healpix_all.png}
+    \hfill
+    \caption{Illustration of HEALPix tiles 7 (red), 10 (green) and 11 (blue) with overset (so-called \emph{padding}) pixels on each side---respectively in orange, yellow and cyan for squares 7, 10, and 11---and composite figures with squares 7, 10 and 11 along with their padding superimposed onto a single globe. For clarity, we plot $64 \times 64$ HEALPix tiles with 2-pixel padding instead of $256 \times 256$ tiles with 16-pixel padding.}
+    \label{fig:overset}
+\end{figure}
+
+In order to blend the HEALPix tiles, we first compute the weight of the padding pixels, which decays linearly from 1 to 0 on each border.
+Second, the coordinates of the padding borders of each HEALPix tile are computed in the Cartesian space of the sphere. Third, we then interpolate the effect of each HEALPix tile's overlap (say, red tile 7 on Fig. \ref{fig:overset}) upon each of its neighbors by computing the coordinates of the external tile in the target tile space (say, green tile 10 on Fig. \ref{fig:overset}) by projecting the Cartesian coordinates of tile 7 onto the HEALPix pixels of tile 10. The blended contribution of each HEALPix tile to its neighbours is computed using weighted sums. This results in new $256 \times 256$ HEALPix data, on which we compute spherical harmonics for re-projection onto the latitude/longitude grid.

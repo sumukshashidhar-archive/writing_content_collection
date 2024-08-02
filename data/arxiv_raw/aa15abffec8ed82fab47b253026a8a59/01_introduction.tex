@@ -1,0 +1,104 @@
+\section{Introduction}
+\label{sx:introduction}
+
+This paper presents a family of neural network compression methods of simulated atmospheric states, with the aim of reducing the currently immense storage requirements of such data from cloud scale (petabytes) to desktop scale (terabytes). 
+%This need for new types of compression methods is motivated by the ubiquitous role that environmental data plays in scientific, industrial, and policy-level disciplines. As datasets increase in size and complexity to meet the demands of these diverse areas, the need for more effective storage and use, and consequently the need for more efficient and bespoke compression solutions, has become more urgent and necessary.
+%
+%Among the use cases for the data is improving our understanding of our planet at climate multi-decadal temporal scale, understanding the history of the planet's climate, weather forecasting, modeling environmental disasters, and reaching agreements over CO$_2$ reduction. 
+This need for compression has come about over past 50~years, characterized by a steady push to increase the resolution of atmospheric simulations, increasing the size and storage demands of the resulting datasets (e.g., \citet{neumann2019assessing}, \citet{schneider2023harnessing}, \citet{essd-16-2113-2024}), while atmospheric simulation has come to play an increasingly critical role in scientific, industrial and policy-level pursuits.
+Higher spatial resolutions unlock the ability of simulators to deliver more accurate predictions and resolve ever more atmospheric phenomena.
+%, and such simulators have come to play a critical role in scientific, industrial, and policy-level disciplines.
+For example, while current models often operate at 25 - 50~km resolution, resolving storms requires 1~km resolution~\citep{stevens2020added}, while resolving the motion of (and radiative effects due to) low clouds require 100~m resolution~\citep{schneider2017earth,satoh2019global}.
+%Increasing spatial resolution is also key to improving the temporal prediction quality of physics-based models.
+Machine learning models for weather prediction also face opportunities and challenges with higher resolution: while additional granularity may afford better modeling opportunities, even the present size of atmospheric states poses a significant bottleneck for loading training data and serving model outputs~\citep{chantry2021opportunities}.
+%Across weather and climate fields, as data sizes have increased, the need for more effective storage and use, and consequently, the need for more efficient and bespoke compression solutions, has become more urgent and necessary.
+
+%This current size of atmospheric states motivates the need for compression. 
+To put the data storage problem in perspective, storing 40 years of reanalysis data from the ECMWF Reanalysis v5 dataset (ERA5, \citet{hersbach2020era5}) at full spatial and temporal resolution (i.e.\ without subsampling)
+%complement of 137 elevation levels, at 0.25$^\circ$ (28~km at equator) spatial resolution and 1~hour temporal resolution~
+requires 181~TB of storage per atmospheric variable.
+For 6 such variables, a single trajectory exceeds 1~PB, to say nothing of an ensemble of tens or hundreds of trajectories as required for model intercomparison or for predicting distributions of outcomes~\citep{eyring2016overview}. %, as with climate models.
+As \citet{sz3_framework} write, ``recent climate research generates 260 TB of data every 16s''. %\citep{foster2017computing}.
+%
+Such conditions create considerable difficulties, prompting researchers to discard data or decrease temporal and/or spatial resolution. 
+%has prompted those developing weather models to discard data, either by decreasing the temporal resolution (as done with the GraphCast \citep{lam2023graphcast} and GenCast \citep{price2023gencast} models) or decreasing the spatial resolution, as in earlier weather forecasting work by \citet{keisler2022forecasting} or \citet{weyn2020improving}.
+%, or limiting the number of steps in multi-step loss (GC, everything else). % Commenting this out, since unlike the previous two examples, this doesn't seem like an example of sidestepping data size problems.
+%
+% Resorting to these methods led to decreased specificity of model predictions and performance of models.
+Having to decimate the dataset to satisfy financial and engineering constraints is especially unfortunate for machine learning models, whose performance is often bounded by the size of the training dataset,
+while also making fair and systematic comparisons to results from traditional numerical weather prediction (NWP) more challenging.
+%
+%Modifying the dataset resolution 
+%
+% These problems of data size become only more acute for climate projection, which can generate multiple sequences of atmospheric states, one for each model or scenario, with each sequence spanning 100 years. 
+Perhaps most importantly, the size of the data precludes access to the full dataset for all but the most well-resourced groups. % to create state-of-the-art models.
+Priced at the time of writing, cloud storage for 100 PB costs on the order of \$1M per month\footnote{This value was obtained by looking up the publicly available rate for cloud storage fees on 28 June 2024 from two of the large cloud storage providers. Costs depend on data replication and access requirements.}.
+
+Data compression is a well-studied problem with many off-the-shelf algorithms available. Unfortunately, for continuous-valued data such as atmospheric states, modern lossless compression methods tailored to such data offer only modest savings, reducing the size by only a factor of 2  (c.f. Figure \ref{fig:reprojection_error_vs_cr_bounded_compression}). Existing lossy compression algorithms pose their own problems, as they are usually designed to compress while optimizing mean squared error~(MSE)~\citep{sz3_algo}.
+In the weather and climate domain, the MSE loss in particular can attenuate high spatial frequencies and thereby remove physically important spatial discontinuities~\citep{ravuri2021nowcasting}. % vs "sharp features"
+%
+%In psychophysical domains such as images, sound and video, specialized algorithms ensure that distortions manifest only in forms that are minimally perceptible to human senses~\citep{wallace1992jpeg}.
+Na\"ive pursuit of reduced MSE can result in significant, scientifically problematic distortions, including outright erasure of entire hurricanes as noted in \cite{huang2022compressing}. This motivates the development of bespoke compression methods evaluated with an eye towards not just MSE but also other physical metrics of scientific interest, such as power spectrum distortion and the preservation of extrema.
+
+%Atmospheric data has received an increasing level of interest for both weather- and climate-related problems. Much of this increased interest is driven by machine-learning approaches to weather prediction. The rapid improvement of these models have led researchers to speculate if one can apply such approaches to climate projection. A key component of ML models are large corpora of data that are used to train models. Unfortunately, the size of these datasets are extremely large; for instance, storing 40-years of 0.25-deg data at 1-hour temporal resolution requires 250TB of storage. The size of such datasets preclude all but the most well-resourced groups from operating as such a resolution, with less well-resourced researchers relegated to operating at vastly reduced spatial and temporal resolutions. Such hindrances slow down the progress of research by limiting the number of researchers on the problem. Moreover, these problems will become only more acute when we look to climate projections, where 100-year data of different scenarios and models increase the amount to data.
+
+% vs "neural compressor" - we say nothing about neural anything to this point
+%At a practical level, we aspire to
+%We aim to bridge this gap by learning compressed representations of the atmosphere to 
+%reduce storage requirements from cloud scale (PB) to desktop scale (TB), enabling researchers to use atmospheric datasets in full without need of discarding data. Such compression also speeds up data transfer at all levels, from sharing results between researchers to increasing data throughput when training a model.
+%At a scientific level, our results illustrate the degree of informational redundancy in atmospheric states. 
+
+% This whole paragraph seems like a bit of a strawman. Cut?
+% At first glance, learning compression of atmospheric states seems infeasible as we aim to learn a low-dimensional representation of 67$M$-dimensional atmospheric states from fewer than 100$K$ examples \footnote{Each atmospheric state is $720 \times 1440 \times 13 \times 5$ at 1 hour temporal resolution for 40 years}. To compare this data to a standard image corpus, the dimensionality of each atmospheric state is greater than 900$\times$ larger than 256$\times$256 ImageNet and LAION-400M data, while containing 10$\times$ (ImageNet) and 10K$\times$ fewer examples. Recent work on AI weather prediction, however, suggests that compression is possible: well-performing models are trained on fewer than 40K examples and have, by modern standards, relatively few parameters (typically fewer than 500M parameters). Such a result suggests that the data is quite regularly structured and easily compressible. Further, preliminary results on unlearned compression on one atmospheric state\citep{klower2021compressing} and implicit neural representations for smooth fields such as geopotential \citep{huang2022compressing} provide further evidence.
+
+% TODO[mkg]: move above data size comparison to Method:data section below. Replace it with an expansion of the "claims" section from the outline.
+Based on the scientific, financial and social needs described above, suitable candidate compressors will be those capable of high compression rates, low error (both on average and for extreme values) and fast execution; %, which preserve physical and spatial consistency.
+adequately meeting these needs will enable researchers to use atmospheric datasets in full without need of subsampling, increase the speed of data dissemination at all levels, and reduce storage costs.
+In pursuit of this goal, we present a family of compression methods based on autoencoder neural networks that are adapted and trained for atmospheric data, and examine the inherent tradeoffs within this design space.
+These compression methods illustrate and exploit the informational redundancy of atmospheric states.
+In Section \ref{sx:learning2compress} we discuss existing compression methods and insight available in this area, and describe our own technical groundwork.
+Within the family of methods we will describe, we will put forward a system based on the hyperprior model~\citep{balle2018hp} as the candidate neural compressor which most fully satisfies the requirements of atmospheric state compression.
+As a case study, we showcase in Figure \ref{fig:hurricane_matthew_hyperprior} the compression results for hurricane Matthew, which shows low errors across physical variables of interest, as well as the ability to preserve extreme values and events.  
+
+\input{figure_hyper_prior_hurricane_matthew}
+
+Our overall approach comprises four stages, depicted in Figure \ref{fig:system}: reprojecting the atmospheric state to a square format better suited to ML accelerators using the HEALPix projection~\citep{gorski1999healpix}, employing a neural encoder to map these projections into a discrete representation (which can be losslessly compressed with standard techniques), reconstructing HEALPix projections using a neural decoder, and finally reprojecting back onto the equirectangular latitude/longitude grid using the spherical harmonics transform.
+
+%We investigate two classes of models-—--hyperprior-based models and vector-quantized autoencoder models—--for neural compression, with the following desiderata:
+%\begin{enumerate}
+%    \item Small average errors (RMSE and MAE) \label{desiderata:mse}
+%    \item Small number of high-error HEALPix pixels \label{desiderata:few_bad_cells}
+%    \item Small error around extreme events \label{desiderata:extreme_events}
+%    \item Preserves the spectral power distribution across spatial scales %\label{desiderata:spectral_error}
+%    \item Fast encoding and decoding \label{desiderata:speed}
+%\end{enumerate}
+
+
+We will show in Section~\ref{sx:experiments} that our approach is able to compress these data at low error by approximately three orders of magnitude, and thus demonstrate bespoke high-compression methods applicable to multi-decadal data.
+We obtain a mean absolute error (MAE) of approximately $0.4^\circ$~K for temperature, approximately $0.5~\text{m}/\text{s}$ for zonal and meridional wind, below 1 hPa for surface pressure and approximately $40~\text{m}^2/\text{s}^2$ for geopotential, with less than 0.5\% of HEALPix pixels beyond an error of $1^\circ$~K (temperature), $1~\text{m}/\text{s}$ (zonal and meridional wind) or less than 0.05\% of pixels beyond an error of $100~\text{m}^2/\text{s}^2$ (geopotential) while preserving spectral shape, and approximately one second encoding/decoding time per global state. 
+We show that high-error pixels are rare enough that their values can be stored in a lookup table while keeping the overall compression ratio above 1000.
+Because sharp features and rare events can be the first victim of aggressive compression, we conduct an analysis of weather events of interest such as hurricanes and heat waves to demonstrate that these are not distorted.
+We provide a discussion of the different variations in use and further contextualisation of the results in Section \ref{sx:discussion}, and discuss limitations and conclude in Section \ref{sx:conclusion}.
+%To our knowledge, this is the first work\footnote{Concurrent work on the compression of ERA5 data with similar errors and compression ratio of $230\times$ to $330\times$ has been published by \citep{han2024cra5}.} that studies neural compression of atmospheric states at a multi-decadal scale with high compression rate of $1000\times$.
+
+%\footnote{We will soon release open-sourcing code and releasing compressed representations for use by the community.}
+
+%
+
+%Interest in weather prediction and climate projection has increased over the past few years, with promising results from machine learning models that are beginning to rival 
+%
+%One peculiarity of atmospheric data compared to image data is that the models that perform well on weather prediction are extremely small compared to the size of the dataset: a well-performing model such as GraphCast is less than 160MB for 6-hourly prediction (compared to 40TB of data). The dimensionality of each atmospheric state is 943x than 256x256 ImageNet and LAION-400M data
+%
+%\emph{these are only rough notes}
+%Weather predictions and climate projections generate a tremendous amount of data. For instance, ECMWF generates XXXXTB of data per year. The atmospheric data generated as part of Earth System Models as part of CMIP6 is XXXX. Of course, this is daily subsampled data. (Say something about data being stored on tape). Design decisions led to these engineering challenges. Very high latency. ML has very different requirements. Need low latency, but not double precision. Cost on GCP.
+%
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/overview_figure.pdf}
+    \hfill
+    \caption{Overview of our neural data compression system. Global surface and atmospheric data are projected onto the 12 HEALPix square base pixels. On the left, the figure illustrates 3 such squares, numbered 7 (in red, over the Indian Ocean), 10 (in green, over continental Europe and Arabic peninsula) and 11 (in blue, over East Asia), for $C$ variables (which may include different physical variables at one or multiple pressure levels), collected from a single atmospheric state at a given timestamp. We jointly compress $C$ separate channels for every $256 \times 256$ square into a quantized representation (here, we illustrate a $32 \times 32$ map of discrete VQ indices corresponding to a 4-downsampling-block VQ-VAE or VQ-GAN). During training and evaluation, we reconstruct the HEALPix squares back from compressed, quantized representations. After reconstruction, spherical harmonics coefficients are calculated via forward transform of the HEALPix reconstructions. These coefficients are used to synthesize re-projected images via inverse transform in latitude/longitude coordinates. On the right, the figure illustrates two re-projected reconstructions for variables 1 and $C$, with areas corresponding to different HEALPix squares coded in different colours. Metrics are computed during reconstruction (comparison of reconstruction vs. ground truth in HEALPix projection), after spherical harmonics forward transform (power spectrum) and after re-projection back onto latitude/longitude representations (comparison of re-projected reconstruction vs. ground truth in latitude/longitude coordinates).}
+    \label{fig:system}
+\end{figure}
+
+

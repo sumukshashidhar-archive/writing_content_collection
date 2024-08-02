@@ -1,0 +1,30 @@
+% \begin{tabular}{lcccccccc}
+% \toprule
+%     AUC PROD & erotic & hate & violence & HR & SH & C4 & H1.a & V3 \\
+% \midrule
+%     Baseline PUB   & .726 & .551 & .532 & .326 & .086 & .779 & .570 & .093 \\
+%     DAT PUB        & .745 & .476 & .531 & .356 & .296 & .777 & .577 & .507 \\
+% \midrule
+%     Baseline MIXED & .943 & .843 & .640 & .453 & .621 & .911 & .851 & .443 \\
+%     DAT MIXED      & .939 & .818 & .633 & .482 & .632 & .936 & .854 & .533 \\
+% \bottomrule
+% \end{tabular}
+
+\begin{tabular}{lcc|cc|cc}
+\toprule
+     \textbf{Category} & \multicolumn{2}{c}{\textbf{PUB}} & \multicolumn{2}{c}{\textbf{SYN}} & \multicolumn{2}{c}{\textbf{MIX}} \\
+     & Baseline & DAT & Baseline & DAT & Baseline & DAT \\
+\midrule
+    \w{S}    & .698 & \textbf{.730} & .726          & \textbf{.745}   & \textbf{.943} & .939 \\
+    \w{H}      & .417 & \textbf{.491} & \textbf{.551} & .476            & \textbf{.843} & .818 \\
+   \w{V}  & .490 & \textbf{.529} & \textbf{.532} & .531            &   \textbf{.640} & .633 \\
+    \w{HR}  & .258 & \textbf{.369} & .326          & \textbf{.356}   & .453 & \textbf{.482} \\
+    \w{SH}        & .063 & \textbf{.281} & .086          & \textbf{.296}   & .621 & \textbf{.632} \\
+    \w{S3}        & .592 & \textbf{.759} & \textbf{.779} & .777 & .911     & \textbf{.936} \\
+    \w{H2}      & .393 & \textbf{.643} & .570          & \textbf{.577}   & .851 & \textbf{.854} \\
+    \w{V2}        & .165 & \textbf{.453} & .093          & \textbf{.507}   & .443 & \textbf{.533} \\
+\bottomrule
+\end{tabular}
+
+
+

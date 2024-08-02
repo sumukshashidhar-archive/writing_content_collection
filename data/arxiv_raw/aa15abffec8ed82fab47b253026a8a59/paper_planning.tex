@@ -1,0 +1,131 @@
+
+\section{Paper planning}
+
+\subsection{Story}
+\subsubsection{Problem}
+
+Much of climate science depends on historical atmospheric datasets like ERA5. However, their PB-scale size costs \$ $X$ to keep on a datacenter, which can be prohibitive to the majority of the scientific community. With scientific demand for ever higher resolution, this problem is set to worsen at a pace that far outstrips the palliative effects of Moore's Law. The usual workaround by researchers is to give up and sample sparsely from such datasets, potentially leaving many insights on the cutting-room table.
+
+\subsubsection{Solution} 
+We compress atmospheric datasets from datacenter-scale to desktop SSD scale, thus enabling researchers to use them in full.
+
+\subsubsection{How this is new and different}
+\begin{enumerate}
+\item We learn the compressor, fitting our representation to the dataset unlike [...].
+\item We validate our work on a large portion of ERA5's frames, and all channels, unlike [...].
+\item Our validation measures not just MSE and PSNR, but also the frequency distribution, unlike [...].
+\item Across the above measures, we are SOTA.
+\end{enumerate}
+
+\subsection{Results}
+\subsubsection{Our claims}
+%We make the following claims:
+\begin{enumerate}
+    \item \textbf{Global spatial error:} Across the test set, our models have lower error in cartesian space than the competition.
+    \begin{enumerate}
+        \item MSE
+        \item Max
+        \item \% "bad pixels" (top N-percentile error)
+        \item All of the above, but in a spatiotemporal window around extreme events (e.g. in the Caribbean, during famous hurricanes there).
+    \end{enumerate}
+    \item \textbf{Global frequency error:} Across the test set, our models have lower error in frequency space than the competition.
+    \item \textbf{Rare events:} Our model gets lower \textbf{\emph{local}} spatial error on rare events (example: local heatwaves, hurricanes) than competing models.
+\end{enumerate}
+
+\subsubsection{Evidence for our claims}
+\begin{enumerate}
+    \item Evidence for \textbf{global spatial error} claim:
+    \begin{enumerate}
+        \item \textbf{MSE vs compression ratio plot}
+        \item[] Show one curve for each of our models (HP, FP, VQVAE, VQGAN), and single points for competing models.
+        \begin{itemize}
+            \item $X$ axis: the compression ratio. 
+            \item $Y$ axis: MSE over all pixels and all frames in the test set. 
+            \item The competing models may need asterisks describing differences in their datasets to ours, for example "* geopotential only". This apples-and-oranges difference may be fine so long as we outperform them on the harder task of measuring on the full test set across all channels (as opposed to them only compressing geopotential on one frame).
+        \end{itemize}
+        \item \textbf{MSE quantiles plot}
+        \item[] MSE quantile plots, transposed to act as plots of the MSE distribution (CDF).
+        \begin{itemize}
+            \item One plot with 5 curves, one for each channel in the vertical levels dataset. \newline $X$ axis: normalized error at quantile boundaries, with denser sampling near the extremes, e.g. [0\%, .001\%, .01\%, .1\%, 1\%, 10\%, 20\%, [...], 80\%, 90\%, 99\%, 99.9\%, 99.99\%, 99.999\%, 100\%] (axis should be just the absolute error value). 
+            \item $Y$ axis: \% of pixels whose error is less than the quantile boundary at $x$. 
+            \item Supporting table: show the un-normalized sensor values corresponding to the quantile boundaries. 5 columns, one for each channel. N rows, one for each quantile boundary. The first and last rows will show the min and max errors for that channel across the whole dataset; emphasize this point.
+        \end{itemize}
+    \item \textbf{PSNR plot (optional)}
+    \item[] Reviewers from image compression may ask for this. Until they do, don't bother. (Easy enough to add it to the eval pipeline.)
+    \end{enumerate}
+    
+    \item Evidence for \textbf{global frequency error} claim:
+    \begin{enumerate}
+        \item Spherical harmonic error plot. 
+        \item[] The new hotness replacing RAPSD plots. Piotr recommends a simple 2D plot of wavelength vs power, like RAPSD. A 3D surface. Show one plot per model, including competitors' models.
+        \begin{itemize}
+            \item X axis: \# of zero-crossings in longitudinal direction.
+            \item Y axis: \# of zero-crossings in latitudinal direction.
+            \item Z axis: $R_{i,j} - D_{i, j}$, where $R_{i,j}$ is the reconstruction's frequency response, and $D_{i,j}$ is the original data's frequency response, to the $(i, j)$'th spherical harmonic. Color coded: 0 = black, positive: blue, negative: red
+            \item If these plots turn out to be mostly radially symmetric in the x-y plane, consider taking the average over theta in polar coordinates, to convert them to RAPSD-style 2D curves that plot power vs frequency. Curves are much easier to read than 3D surfaces. This would allow us to plot all models' curves on one plot. Note that despite the visual similarity to RAPSD, this is still a big improvement over it, since it's measured over the whole earth, not a single healpix square with awkward hacks to work around the edges.
+        \end{itemize} 
+    \end{enumerate}
+    
+    \item Evidence for \textbf{rare events} claim:
+    \begin{enumerate}
+        \item MSE vs value plot.
+        \item[] This measures the pixelwise reconstruction error, as a function of pixel value intensity. A model that reconstructs large values poorly does not preserve extreme events well.
+        \begin{itemize}
+            \item $X$ axis: log(absolute normalized value) (range: $[0, log(v_{max}/\sigma)]$).
+            \item $Y$ axis: MSE over all pixels and all frames in test set with that value.
+            \item Plot multiple curves on a single plot, one curve per model (including competitors). Curves should show variance envelopes. For models that compress extreme values poorly, the curve will go up and to the right. 
+        \end{itemize}
+        \item Screenshot of bad and good hurricane reconstruction.
+        \item[] as an example here, show the figure 9 of~\cite{hoefler2023earth} in figure~\ref{fig:hurricane_matthew_hoefler2023earth} with disappearing hurricane for NN and preserved hurricane in SZ3.
+        
+        \begin{figure}[ht]
+            \centering
+            % Replace 'example-image' with the path to your actual image file
+            \includegraphics[width=0.7\textwidth]{assets/ref_nn_sz3_hurricane_matthew_hoefler2023}
+            \caption{\cite{hoefler2023earth} achieve high compression ratios, which comes at the expense of recovering extreme events }
+            \label{fig:hurricane_matthew_hoefler2023earth}
+        \end{figure}
+    \end{enumerate}
+\end{enumerate}
+
+
+\subsubsection{Ablations}
+%We make the following claims:
+\begin{enumerate}
+    \item \textbf{Padding:} Our padding + interpolation results in quantitative and qualitative improvements (supressing seams).
+    \item \textbf{Hyperparameter choices:} Our models are well tuned.
+\end{enumerate}
+
+
+\subsubsection{Ablations description}
+\begin{enumerate}
+    \item Ablations for \textbf{padding} choice:
+    \begin{enumerate}
+        \item TODO
+        \begin{itemize}
+            \item TODO
+        \end{itemize}
+    \end{enumerate}
+    
+    \item Ablations for \textbf{hyperparameter} choice:
+    \begin{enumerate}
+        \item TODO
+        \begin{itemize}
+            \item TODO
+        \end{itemize} 
+    \end{enumerate}
+\end{enumerate}
+
+\subsubsection{Contributions}
+\begin{enumerate}
+    \item Open-source code?
+    \item Open-source trained model + compressed ERA5?
+    \item Open-source colab that uses the above trained model?
+\end{enumerate}
+
+
+\section{Unimportant TODOs, in decreasing order}
+\begin{itemize}
+    \item VITVQ
+    \item FSQ (Finite Scalar Quantization)
+\end{itemize}

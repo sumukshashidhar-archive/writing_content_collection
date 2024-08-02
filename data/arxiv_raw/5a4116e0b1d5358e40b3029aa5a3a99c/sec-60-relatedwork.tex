@@ -1,0 +1,39 @@
+\section{Limitations and Future Directions}
+We believe many improvements can be made to our autoencoders.
+
+\begin{itemize}
+    \item TopK forces every token to use exactly $k$ latents, which is likely suboptimal. Ideally we would constrain $\mathbb E[L_0]$ rather than $L_0$.
+    \item The optimization can likely be greatly improved, for example with  learning rate scheduling,\footnote{Anecdotally, we also found that lowering learning rates helped with decreasing dead latents.} better optimizers, and better aux losses for preventing dead latents.
+    \item Much more could be done to understand what metrics best track relevance to downstream applications, and to study those applications themselves.  Applications include:  finding vectors for steering behavior, doing anomaly detection, identifying circuits, and more.
+    \item We're excited about work in the direction of combining MoE \citep{shazeer2017outrageously} and autoencoders, which would substantially improve the asymptotic cost of autoencoder training, and enable much larger autoencoders.
+    \item A large fraction of the random activations of features we find, especially in GPT-4, are not yet adequately monosemantic. We believe that with improved techniques and greater scale\footnote{both in number of latents and in training tokens} this is potentially surmountable.
+    \item Our probe based metric is quite noisy, which could be improved by having a greater breadth of tasks and higher quality tasks.
+    \item While we use n2g for its computational efficiency, it is only able to capture very simple patterns. We believe there is a lot of room for improvement in terms of more expressive explanation methods that are also cheap enough to simulate to estimate explanation precision.
+    \item A context length of 64 tokens is potentially too few tokens to exhibit the most interesting behaviors of GPT-4.
+
+\end{itemize}
+
+
+\section{Related work}
+
+Sparse coding on an over-complete dictionary was introduced by \cite{mallat1993matching}.
+\cite{olshausen1996emergence} refined the idea by proposing to learn the dictionary from the data, without supervision. This approach has been particularly influential in image processing, as seen for example in \citep{mairal2014sparse}.
+Later, \cite{hinton2006reducing} proposed the autoencoder architecture to perform dimensionality reduction. 
+Combining these concepts, sparse autoencoders were developed \citep{lee2007sparse,le2012building,konda2014zero} to train autoencoders with sparsity priors, such as the \Lone penalty, to extract sparse features.
+\cite{makhzani2013k} refined this concept by introducing $k$-sparse autoencoders, which use a TopK activation function instead of the \Lone penalty. \cite{makelov2024principled} evaluates autoencoders using a metric that measures recovery of features from previously discovered circuits.
+
+
+More recently, sparse autoencoders were applied to language models \citep{yun2021transformer, sharkey2022taking, bricken2023monosemanticity, cunningham2023sparse},
+and multiple sparse autoencoders were trained on small open-source language models \citep{marks2023some, bloom2024open, mossing2024tdb}.
+\cite{marks2024sparse} showed that the resulting features from sparse autoencoders can find sparse circuits in language models.
+\cite{wright2024addressing} pointed out that sparse autoencoders are subject to activation shrinking from \Lone penalties, a property of \Lone penalties first described in \cite{tibshirani1996regression}.
+\cite{taggart2024prolu} and \cite{rajamanoharan2024improving} proposed to use different activation functions to address activation shrinkage in sparse autoencoders.  \citet{braun2024identifying} proposed to train sparse autoencoders on downstream KL instead of reconstruction MSE.
+
+\cite{kaplan2020scaling} studied scaling laws for language models which examine how loss varies with various hyperparameters.  \cite{clark2022unified} explore scaling laws related to sparsity using a bilinear fit.
+\cite{lindsey2024scaling} studied scaling laws specifically for autoencoders, defining the loss as a specific balance of reconstruction and sparsity (rather than simply reconstruction, while holding sparsity fixed).
+
+
+
+
+
+

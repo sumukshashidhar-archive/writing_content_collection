@@ -1,0 +1,89 @@
+\section{Analysis and Discussion}
+\label{sx:discussion}
+
+Next, we motivate the use of neural compression methods by comparison with error-bound compression, discuss the possibility of compressing high-error residuals (Section \ref{sx:discuss:error-bound}), and present results for single-variable models (Section \ref{sx:discuss:geopotential}). A principal limitation of  neural compression methods for scientific data is that they have unbounded (and potentially high) maximum element-wise reconstruction errors. We investigate and explain a cause of this high error for the ERA5 dataset as being due to artefacts present in the dataset as well as joint reconstruction of multiple variables (Section \ref{sx:discuss:limitation-artefacts}). Finally, we evaluate performance of generalization over time in Section \ref{sx:discuss:generalisation}).
+
+
+\subsection{Comparison with error-bounded compression}
+\label{sx:discuss:error-bound}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\textwidth, trim = 3cm 0cm 4cm 0cm, clip]{figures/experiments/reprojection_stats/reprojection_weighted_rmse_mae_bounded_compression_all_temperature.pdf}
+    \hfill
+    \caption{Reconstruction and reprojection error vs. compression ratio, for vertical data, in equirectangular projection. Columns: metrics: respectively root mean squared error (RMSE), mean absolute error (MAE) and maximum error. Results are computed on the daily 2016 baseline dataset. Lower errors and higher compression rates are better (bottom right of each plot).}
+    \label{fig:reprojection_error_vs_cr_bounded_compression}
+\end{figure}
+
+Our compression techniques achieve strong compression ratios for comparable mean reconstruction errors compared to conventional and competing methods.
+However, they lack the precise error bound guarantees provided by off-the-shelf compression tools. 
+To address this, we investigated compressing the residuals post-neural compression using both~\citet{sz3_algo} and~\citet{zfpy_2014} to ensure both compression performance and error control. As shown in Figure \ref{fig:reprojection_error_vs_cr_bounded_compression}, bounded compression methods such as SZ3 achieve far lower compression ratios of temperature (i.e., less than $50\times$) for similar errors (namely, weighted RMSE and weighted MAE of the order of $1^\circ$~K) than the neural compression models.
+
+We compared further compressing the residuals of neural compression (e.g., the hyperprior reconstructions in HEALPix projection minus the ground truth in HEALPix projections) and observed similar compression ratios at given error bounds; in other words, compressing the residual was as expensive as compressing the original data using bounded compression methods. We note that SZ3 operates on 1D data, and as such does not exploit the spatial correlations in the data.
+
+From the results in section~\ref{sx:experiments:bad-pixels}, about $0.5\%$ of reconstructed HEALPix pixels present errors higher than the error threshold of $\pm 1^\circ$~K. We could consider compressing the values of those pixels using the SZ3 bounded compression method at a compression ratio of the order of $10\times$, which would result in the order of $1000\times$ compression ratio. However, we would still need to store the byte position (row and column) of those high-error pixels in the $256 \times 256$ tile, or preferably, develop a storage strategy that exploits local spatial correlations of those erroneous pixels. It is also not obvious that such a method would not create additional discontinuities (and as a consequence, high-frequency artefacts) in the reconstructed images. 
+
+\subsection{Comparison with single-variable models}
+\label{sx:discuss:geopotential}
+
+The approach we present is developed for multivariate compression, i.e. compression of multiple atmospheric variables using a single latent code.
+It is also possible to develop compression models for individual variables.
+Figure \ref{fig:reprojection_error_vs_cr} shows that the 4-block VQ-VAE model trained only on geopotential data manages to reconstruct geopotential with $\text{MAE} = 0.2~\text{m}^2/\text{s}^2$ at all levels latitude/longitudewhile maintaining an effective compression ratio of $1800\times$. The last row of Table \ref{tab:percent_bad_cells_vqvae} highlights that very few (0.012\%) pixels cross the 100 $\text{m}^2/\text{s}^2$ error threshold. The right-most column of Figure \ref{fig:spectra} shows that the power spectrum of that model's reconstructions of geopotential are the closest to the spectrum of the reprojection.
+
+% ---Too much detail for initial tech report---
+%While multivariate compression is able to exploit correlations in the data, this single-variable compression result points to a promising alternative for achieving higher compression rates. Although, single-variable neural compression requires running as many models as there are atmospheric variables of interest.
+%This finding suggests a potential modular modification of the proposed architecture: compressing multivariate weather data into a single common representation that incorporates context from different physical variables, then reconstructing individual variables separately using dedicated decompressors.
+
+
+\subsection{Difficulty in learning and reconstructing specific variables and pressure levels}
+\label{sx:discuss:limitation-artefacts}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.45\textwidth, trim = 0cm 25.5cm 2cm 3.5cm, clip]{figures/experiments/error_vs_level/rmse_across_levels_variables_Hyperprior.pdf}
+    \includegraphics[width=0.45\textwidth, trim = 0cm 25.5cm 2cm 3.5cm, clip]{figures/experiments/error_vs_level/rmse_across_levels_variables_3-VQ-VAE.pdf}
+    \hfill
+    \caption{Standardised RMSE of different variables and atmospheric levels for a single hyperprior model (left) and a 3-block VQ-VAE model (right) at about $1000\times$ compression ratios.}
+    \label{fig:rmse_comparison_variables}
+\end{figure}
+
+We investigate which variables and pressure levels pose particular challenges for our models.
+Recall that prior to training, individual variables are standardised to zero mean, unit standard deviation per pressure level, with means and standard deviations computed across all frames of the training dataset.
+While it is important to ground most analyses in ``unstandardised'' computations such that deviations between reconstruction and ground truth are reported the correct units for each variable, comparing the characteristics of individual reconstructed variables before the standardisation is undone can provide insight into the information being preserved by the encoded representation.
+%The surface models take 4 channels representing temperature at 2 m, surface pressure, zonal and meridional wind speeds at 10 m as inputs and as targets for the reconstruction; the vertical models take in and predict 5 channels representing temperature, geopotential, zonal and meridional wind speed, and specific humidity.
+
+Figure \ref{fig:rmse_comparison_variables} depicts the \emph{standardized} average root mean square error computed separately for different variables and different pressure levels, for both the hyperprior model at around $1000\times$ compression rate and the 3-block VQ-VAE model at $1100\times$ compression rate. We first notice that the hyperprior model achieves lower RMSE across all variables than the 3-block VQ-VAE model. We also observe that specific humidity consistently has the lowest RMSE overall among vertical data models, and that surface pressure has the lowest RMSE among surface models; then comes temperature, and then wind speed and geopotential. We observe interesting patterns persistent across models, such as wind speeds at 850 hPa having the highest RMSE.
+
+We notice that the main difference between the RMSE profile for the hyperprior model and the VQ-VAE model is the higher RMSE at 50 hPa. In fact, other deep learning models seem to have faced relatively poor performance at the 50 hPa level when training on the same dataset, as evidenced by the per-pressure level scorecards for the GraphCast model~\citep{lam2023graphcast} (in particular, see Figs. 2 and 29, where the prediction skills is significantly lower than at other pressure levels). We surmise that these reconstruction or prediction errors are due to out-of-sample, low-value anomalies in the specific humidity at 50 hPa, at the limit of the upper part of the troposphere, and present a detailed analysis of the data artefacts in Appendix \ref{sx:appendix:artefacts}.
+A potential remedy is to simply extend the training set: while autoencoders can be applied to data beyond the training set, it is entirely valid to train a bespoke compressor and decompressor on an entire target dataset if the performance requirements justify the additional computation.
+
+Figure \ref{fig:error_histograms} seems to suggests that error maxima should be bounded, as the $10^{-5}$ fraction of errors 
+corresponds to about $\pm 5^\circ$~K (temperature), $\pm 400~\text{m}^2/\text{s}^2$ (geopotential) or $\pm 8~\text{m}/\text{s}$ (zonal wind speed). However, looking at the error maxima on Figure \ref{fig:reprojection_error_vs_cr} shows that the max errors (over 366 frames of the daily 2016 dataset subset) of the hyperprior are as high as $\pm 18^\circ$~K, $\pm 4000~\text{m}^2/\text{s}^2$ and $\pm 40~\text{m}/\text{s}$. Higher error maxima appear on the full test dataset covering 2010-2023.
+
+Our error analysis exposes three potential shortcomings of autoencoder methods. The first is that these models lack error-bound guarantees.
+Second, these methods seem to poorly handle out-of-sample artefacts in the data, which may cause them to produce reconstructions with unbounded errors (see analysis of artefacts in Appendix \ref{sx:appendix:artefacts}). Lastly, while compressing variables jointly fruitfully exploits statistical redundancy across variables, this results in brittleness, where an artefact present in the values of one variable may contaminate the reconstruction of another variable.
+
+%The latter point confirms the conclusion from previous section \ref{sx:discuss:geopotential}. The original design choice to process multiple variables at a time was prompted by exploiting correlations in the weather variables; our current area of investigation is to reconstruct different variables separately, as our preliminary results on the compression of geopotential compression using a 4-block VQ-VAE seem to suggest. 
+
+
+\subsection{Generalisation of compression over time}
+\label{sx:discuss:generalisation}
+
+Unlike methods where the neural network is trained to be a functional over the training data, such as our baseline data compression method \citep{huang2022compressing}, our autoencoder-based approach allows for generalization to unseen data frames; this is a significant advantage as we do not need to retrain the compression model to handle new data frames.
+
+Given that weather and climate processes are not stationary, a pressing question is whether, and how quickly, the compression model deteriorates as a function of time. Our dataset split with training on data covering 1959 through 2009, and evaluation on data covering 2010 through 10 January 2023, allows us to test that hypothesis over 13 years. % and focuses on over a decade of ever-intensifying climate change and global warming.
+
+Figure \ref{fig:generalisation-time} illustrates the absolute value RMSE (averaged over HEALPix squares, hours of the days and days of the month) for 4 variables and 5 different pressure levels, as well as a yearly rolling average. The yearly average of temperature, wind speed and specific humidity at 500 hPa, 850 hPa and 1000 hPa seem to have an upward trend over the years. The simplest explanation for such a trend would be that the model is expected to perform worse on test samples that are further away from the training data cutoff date (in our case, 31 December 2009).
+
+However, the monthly average clearly exhibits strong seasonal tendencies that dominate the variability of the yearly rolling average. The standardized RMSE has similar seasonalities, as does the RMSE of the 3-block VQ-VAE model. We also know that because of the unequal land mass distribution between the northern and southern hemisphere, weather variables such as global temperature exhibit seasonality.% We therefore hypothesize that our neural compression models may be heteroskedastic, meaning that it has reconstruction errors that depend on the measured value. A possible strategy to remedy against this is to include conditioning on the time of the year into the model inputs.
+
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth, trim = 5.5cm 0cm 5cm 0cm, clip]{figures/experiments/time/time_Hyperprior_rmse_cropped_level100.pdf}
+    \includegraphics[width=\textwidth, trim = 5.5cm 0cm 5cm 0cm, clip]{figures/experiments/time/time_Hyperprior_rmse_cropped_level500.pdf}
+    \includegraphics[width=\textwidth, trim = 5.5cm 0cm 5cm 0cm, clip]{figures/experiments/time/time_Hyperprior_rmse_cropped_level850.pdf}
+    \includegraphics[width=\textwidth, trim = 5.5cm 0cm 5cm 0cm, clip]{figures/experiments/time/time_Hyperprior_rmse_cropped_level1000.pdf}
+    \hfill
+    \caption{Plot of the average RMSE over 13 years of the test set, from 1/1/2010 to 31/12/2022, using the hyperprior with about $1000\times$ compression rate. Rows from top to bottom show results at 50 hPa, 100 hPa, 150 hPa, 500 hPa, 850 hPa and 1000 hPa, and columns show temperature, geopotential, zonal wind speed and specific humidity. The blue curve shows the monthly average (and exhibits strong seasonal tendencies); the red dashed curve shows the yearly rolling average (and suggests an upward trend over the years, the further away the test sample from the training data cutoff date of 31 December 2009).}
+    \label{fig:generalisation-time}
+\end{figure}

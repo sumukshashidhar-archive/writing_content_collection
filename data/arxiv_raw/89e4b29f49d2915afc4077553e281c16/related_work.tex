@@ -1,0 +1,9 @@
+\section{Related Work}
+The idea of solving inverse problems with generative models has been proposed in the Compressed Sensing with Generative Models (CSGM) framework~\citep{bora2017compressed}. However, the original CSGM method is centered around latent variable models such as Generative Adversarial Networks \citep[GANs,][]{goodfellow2014generative} and Variational Auto-Encoders \cite[VAEs,][]{kingma-AutoEncodingVariationalBayes-2014,rezende-StochasticBackpropagationApproximate-2014}. It is unclear how to apply CSGM to other families of generative models like Energy-Based Models \citep[EBMs,][]{song2021train} and score-based generative models.
+
+SNIPS~\cite{kawar2021snips} (solving noisy inverse problem stochastically).
+
+Solving linear inverse problems with unsupervised learning and denoising score matching~\citep{vincent2011connection} has also been explored in \citet{kadkhodaie2020solving}. In contrast with our approach, their method requires projecting an noisy sample onto the kernel space of a linear operator, which can be expensive to compute for high dimensional data. They did not consider applications in medical imaging either.
+
+Concurrently, \citet{jalal2020robust} extends the NCSNv2 model~\citep{song2020improved}, a score-based generative model sampled by annealed Langevin dynamics~\citep{song2019generative}, to solve inverse problems in downsampled MRI reconstruction. Our method is applicable to more general sampling methods~\citep{song2021scorebased} for score-based generative models, such as numerical SDE solvers, Predictor-Corrector samplers, and probability flow ODE samplers. We also obtained uniformly better empirical performance in our experiments.
+

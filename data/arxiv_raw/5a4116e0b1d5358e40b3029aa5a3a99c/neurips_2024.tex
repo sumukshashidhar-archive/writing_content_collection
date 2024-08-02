@@ -1,0 +1,174 @@
+\documentclass{article}
+
+
+
+
+\usepackage[preprint]{neurips_2024}
+\usepackage{subcaption}
+
+
+
+
+
+
+
+
+\usepackage[utf8]{inputenc} %
+\usepackage[T1]{fontenc}    %
+\usepackage{hyperref}       %
+\usepackage{url}            %
+\usepackage{booktabs}       %
+\usepackage{amsfonts}       %
+\usepackage{nicefrac}       %
+\usepackage{microtype}      %
+\usepackage{xcolor}         %
+\usepackage{todonotes}
+\usepackage{listings}
+\usepackage{multirow}
+\usepackage{floatpag}
+\usepackage{wrapfig}
+\usepackage{multicol}
+\usepackage{setspace}
+\usepackage{lipsum}
+\usepackage{soul}
+
+\linepenalty=1000  %
+
+\usepackage{amsmath}  %
+
+\usepackage{xcolor}  %
+\definecolor{linkcolor}{RGB}{57, 168, 92}
+\definecolor{citecolor}{RGB}{70, 88, 207}
+\hypersetup{
+  colorlinks=true,
+  citecolor=citecolor,
+  linkcolor=citecolor,
+  urlcolor=linkcolor,
+}
+
+\newif\ifpreprint
+\preprinttrue  %
+
+\newcommand{\algorithmautorefname}{Algorithm}
+\renewcommand{\subsectionautorefname}{Section}
+\renewcommand{\sectionautorefname}{Section}
+
+\linepenalty=1000
+\everypar{\looseness=-1}
+
+\newcommand{\R}{\mathbb{R}}
+\usepackage{xspace}
+\newcommand{\Lzero}{L$_0$\xspace}
+\newcommand{\Lone}{L$_1$\xspace}
+\newcommand{\Ltwo}{L$_2$\xspace}
+\newcommand{\Linf}{L$_\infty$\xspace}
+
+
+\title{Scaling and evaluating sparse autoencoders}
+
+
+
+
+
+
+
+
+\author{%
+  Leo Gao\thanks{Primary Contributor. Correspondence to lg@openai.com. } \\
+  \And
+  Tom Dupr\'e la Tour\thanks{Core Research Contributor. This project was conducted by the Superalignment Interpretability team. Author contributions statement in  \autoref{sec:contributions}.} \\
+  \And
+  Henk Tillman$^\dagger$ \\
+  \AND
+  Gabriel Goh \\
+  \And
+  Rajan Troll \\
+  \And
+  Alec Radford \\
+  \AND
+  Ilya Sutskever \\
+  \And
+  Jan Leike \\
+  \And
+  Jeffrey Wu$^\dagger$ \\
+  \AND
+  \normalfont{OpenAI}
+}
+
+
+\begin{document}
+
+
+\maketitle
+\vspace{-2mm}
+\begin{abstract}
+
+
+
+Sparse autoencoders provide a promising unsupervised approach for extracting interpretable features from a language model by reconstructing activations from a sparse bottleneck layer.  Since language models learn many concepts, autoencoders need to be very large to recover all relevant features.  However, studying the properties of autoencoder scaling is difficult due to the need to balance reconstruction and sparsity objectives and the presence of dead latents.  We propose using k-sparse autoencoders \citep{makhzani2013k} to directly control sparsity, simplifying tuning and improving the reconstruction-sparsity frontier. Additionally, we find modifications that result in few dead latents, even at the largest scales we tried.  Using these techniques, we find clean scaling laws with respect to autoencoder size and sparsity.  We also introduce several new metrics for evaluating feature quality based on the recovery of hypothesized features, the explainability of activation patterns, and the sparsity of downstream effects. These metrics all generally improve with autoencoder size.  To demonstrate the scalability of our approach, we train a 16 million latent autoencoder on GPT-4 activations for 40 billion tokens.  We release \href{https://github.com/openai/sparse_autoencoder}{code and autoencoders for open-source models}, as well as a \href{https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html}{visualizer}.\footnote{Our open source code can be found at \href{https://github.com/openai/sparse_autoencoder}{https://github.com/openai/sparse\_autoencoder} and our visualizer is hosted at \href{https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html}{https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html}}
+
+
+
+
+\end{abstract}
+
+\input{sec-00-intro}
+
+\input{sec-10-methods}
+
+\input{sec-20-scaling}
+
+
+\input{sec-30-metrics}
+\input{sec-40-understanding}
+
+\input{sec-60-relatedwork}
+
+
+
+
+\begin{ack}
+
+We are deeply grateful to Jan Leike and Ilya Sutskever for leading the Superalignment team and creating the research environment which made this work possible.  We thank David Farhi for supporting our work after their departure.
+
+We thank Cathy Yeh for explorations in finding features.  We thank Carroll Wainwright for initial insights into clustering latents.  
+
+We thank Steven Bills, Dan Mossing, Cathy Yeh, William Saunders, Boaz Barak, Jakub Pachocki, and Jan Leike for many discussions about autoencoders and their applications.
+We thank Manas Joglekar for some improvements on an earlier version of our activation loading. We thank William Saunders for an early autoencoder visualization implementation.
+
+We thank Trenton Bricken, Dan Mossing, and Neil Chowdhury for feedback on an earlier version of this manuscript.
+
+We thank Trenton Bricken, Lawrence Chan, Hoagy Cunningham, Adam Goucher, Ryan Greenblatt, Tristan Hume, Jan Hendrik Kirchner, Jake Mendel, Neel Nanda, Noa Nabeshima, Chris Olah, Logan Riggs, Fabien Roger, Buck Shlegeris, John Schulman, Lee Sharkey, Glen Taggart, Adly Templeton, Vikrant Varma for valuable discussions.
+
+
+
+
+
+\clearpage
+
+\end{ack}
+
+
+\bibliographystyle{plainnat}
+\bibliography{references} 
+
+\appendix
+
+
+\input{sec-a10-optimization}
+
+\input{sec-a20-ablations}
+
+\input{sec-a30-systems}
+
+
+
+\input{sec-50-qualitative}
+
+
+\input{sec-a50-miscellaneous}
+
+\input{sec-a60-contributions}
+
+
+\end{document}

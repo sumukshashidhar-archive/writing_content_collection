@@ -1,0 +1,133 @@
+\subsection{Supplemental results for VQ-VAE}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_3-VQ-VAE_temperature_850hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_3-VQ-VAE_specific_humidity_1000hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_3-VQ-VAE_u_component_of_wind_1000hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 4cm 5cm 3cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_3-VQ-VAE_u_component_of_wind_zoom_1000hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_3-VQ-VAE_geopotential_500hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 4cm 5cm 3cm, clip]{figures/experiments/hurricane_matthew/2016_10_5-0_3-VQ-VAE_geopotential_zoom_500hPa.pdf}
+    \hfill
+    \caption{Examples of 3-layer VQ-VAE reconstructions of a global frame on 2016/10/5 at 0 UTC, compressed $\approx 1000\times$. From top to bottom, plots show temperature at 850 hPa, specific humidity at 1000 hPa, the zonal component of wind at 1000 hPa and geopotential at 500 hPa. While errors are higher than the hyperprior model's (see Fig. \ref{fig:hurricane_matthew_hyperprior}), Hurricane Matthew's reconstruction remains visible.}
+    \label{fig:hurricane_matthew_vqvae}
+\end{figure}
+
+Figure \ref{fig:hurricane_matthew_vqvae} shows the example of reconstruction of Hurricane Matthew on 5 October 2016 using the 3-layer VQ-VAE with $1100\times$ compression rate. It can be contrasted with Fig. \ref{fig:hurricane_matthew_hyperprior} for the hyperprior model. Specifically on the frame corresponding to 5 October 2016 at 0 UTC, the VQ-VAE achieves $\text{MAE}=52.8~\text{m}^2/\text{s}^2$ on geopotential at 500 hPa, $\text{MAE}=0.65^\circ$~K on temperature at 850 hPa, $\text{MAE}=2.1 \times 10^-4$ for specific humidity at 1000 hPa, $\text{MAE}=0.52~\text{m}/\text{s}$ for zonal wind speed at 1000 hPa; whereas the Hyper Prio achieves respectively $\text{MAE}=32.8~\text{m}^2/\text{s}^2$, $\text{MAE}=0.5^\circ$~K, $\text{MAE}=2.1\times10^-4$ and $\text{MAE}=0.39~\text{m}/\text{s}$. In line with the overall performance of these models on the whole dataset (see Fig. \ref{fig:error_vs_cr}) and on the hourly 2016 baseline dataset (see Fig. \ref{fig:reprojection_error_vs_cr}), the hyperprior model performs slightly better than the VQ-VAE in reconstructing this specific hurricane.
+
+\subsection{Reconstruction results in HEALPix projection}
+
+Figure \ref{fig:error_vs_cr} compares all models on the reconstruction task in HEALPix projection on both surface and vertical data, using the following metrics: RMSE, MAE and number of pixels beyond a given error threshold. These results are reported in HEALPix pixel space, i.e. without reprojection to latitude/longitude coordinates and subsequent additional reprojection errors, and confirm the choice of the hyperprior model as the least erroneous compression method.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\textwidth, trim = 3cm 0cm 3cm 0cm, clip]{figures/experiments/reconstruction_stats/surface_rmse_mae_bad_pixels_2m_temperature.pdf}
+    \includegraphics[width=0.8\textwidth, trim = 3cm 0cm 3cm 0cm, clip]{figures/experiments/reconstruction_stats/surface_rmse_mae_bad_pixels_surface_pressure.pdf}
+    \includegraphics[width=0.8\textwidth, trim = 3cm 0cm 3cm 0cm, clip]{figures/experiments/reconstruction_stats/surface_rmse_mae_bad_pixels_10m_u_component_of_wind.pdf}
+    \includegraphics[width=0.8\textwidth, trim = 3cm 0cm 3cm 0cm, clip]{figures/experiments/reconstruction_stats/vertical_rmse_mae_bad_pixels_level_850_temperature.pdf}
+    \includegraphics[width=0.8\textwidth, trim = 3cm 0cm 3cm 0cm, clip]{figures/experiments/reconstruction_stats/vertical_rmse_mae_bad_pixels_level_500_geopotential.pdf}
+    \includegraphics[width=0.8\textwidth, trim = 3cm 0cm 3cm 0cm, clip]{figures/experiments/reconstruction_stats/vertical_rmse_mae_bad_pixels_level_1000_specific_humidity.pdf}
+    \includegraphics[width=0.8\textwidth, trim = 3cm 0cm 3cm 0cm, clip]{figures/experiments/reconstruction_stats/vertical_rmse_mae_bad_pixels_level_850_u_component_of_wind.pdf}
+    \hfill
+    \caption{Reconstruction error vs. compression ratio on both surface and vertical data, in HEALPix projection. Colors correspond to models: respectively 3-block VQ-VAE and VQ-GAN, 4-block VQ-VAE and VQ-GAN, factorized prior and hyperprior. Rows: atmospheric variables: temperature at 2 m, surface pressure, zonal component of wind at 10 m, temperature at 850 hPa, geopotential at 500 hPa, specific humidity at 1000 hPa and zonal component of wind at 850 hPa. Columns: error metrics. Errors are computed over all hourly frames in the evaluation set (2010-2023). MAE is the mean absolute error. ``Num bad pixels'' is the percent of pixels exceeding the threshold shown on the y-axis.}
+    \label{fig:error_vs_cr}
+\end{figure}
+
+\subsection{Ablations}
+
+We verify that the MAE of a VQ-VAE model trained on $288 \times 288$ squares (which correspond to a HEALPix tile padded with 16 pixels on each side, see Appendix \ref{sx:appendix:overset_healpix}), and when evaluated in the central $256 \times 256$ area, is similar to the MAE of a VQ-VAE model directly trained on on $256 \times 256$ HEALPix squares. The purpose of this comparison is to understand if the models are penalised when we input and reconstruct overset HEALPix grids. We evaluate on the central $256 \times 256$ crop of the HEALPix tile, because these are the non-overlapping data that cover the sphere and are used in reprojection.
+
+The first result that Figure \ref{fig:ablate_pad_and_postprocess} shows, is that calibrating the reconstructions by making each reconstructed square have the same mean and standard deviation as the input square, reduces both MAE and the percentage of pixels beyond the error thresholds. This is visible when comparing {\tt VAE unormalised} to {\tt VAE calibrated} and comparing {\tt VAE pad unormalised} to {\tt VAE pad calibrated}. This result is intuitive because we ensure that the reconstruction has the same first and second order moment statistics as the target. 
+
+The second result is that {\tt VAE cropped} (a model trained to predict $256 \times 256$ outputs and ``cropped'' to the central $256 \times 256$ area (i.e. without any change) has comparable performance to {\tt VAE pad cropped} (a model trained to predict $288 \times 288$ outputs but actually cropped to the central $256 \times 256$ area).
+
+The third results is that including orography inputs drives down the reconstruction MAE and the percentage of bad pixels (beyond the error threshold) (compare {\tt VAE pad} with {\tt VAE pad orography}, and {\tt GAN pad} with {\tt GAN pad orography}).
+
+These ablations confirm the intuitive design choices we adopted in our study.
+
+
+\begin{figure}
+    \centering
+        \includegraphics[width=0.497\textwidth, trim = 2cm 0cm 3cm 0cm, clip]{figures/experiments/ablations/ablation_cropping_2m_temperature.pdf}
+        \includegraphics[width=0.497\textwidth, trim = 2cm 0cm 3cm 0cm, clip]{figures/experiments/ablations/ablation_padding_2m_temperature.pdf}
+        \includegraphics[width=0.497\textwidth, trim = 2cm 0cm 3cm 0cm, clip]{figures/experiments/ablations/ablation_cropping_surface_pressure.pdf}
+        \includegraphics[width=0.497\textwidth, trim = 2cm 0cm 3cm 0cm, clip]{figures/experiments/ablations/ablation_padding_surface_pressure.pdf}
+    \caption{Reconstruction error vs compression ratio on surface data in HEALPix projection. Rows: surface variables: respectively temperature at 2 m and surface pressure. Columns: error metrics: mean absolute error (MAE) and ``number of bad pixels'' which is the percentage of pixels exceeding the 1$^\circ$ K or 1 hPa error threshold. The curves compare two models (4-block VQ-VAEs and VQ-GANs) and three post-processing schemes, to ablate their effects on error. The two models are equivalent, except that one takes padded inputs as described in section~\ref{sx:appendix:overset_healpix}. For most compression ratios, the padded models outperform the unpadded models. Additionally, we plot three postprocessing methods. In \textbf{unnormalized}, the reconstruction is scaled by the standard deviation of that variable, and shifted by the mean, where these statistics are computed over the entire training set. In \textbf{calibrated}, the reconstruction is scaled and shifted by the statistics of that variable as computed from the specific frame and HEALpix square being reconstructed. In \textbf{cropped}, the reconstruction metric is averaged only over the central $256 \times 256$ crop (as opposed to the full HEALPix area). Models with \textbf{orography} use additional conditioning on orography features.}
+\label{fig:ablate_pad_and_postprocess}
+\end{figure}
+
+\subsection{Histogram of errors vs. ground truth values}
+\label{sx:appendix:hist2d-err-value}
+
+In order to understand the distribution of the errors vs. the ground truth target values for the hyperprior model, we compute two-dimensional histograms over the entire test set. To make the computation tractable, we compute the histogram by binning the target values and the reconstruction errors. In the case of temperature and wind speed, we bin the targets to the closest integer value, namely from $171^\circ~\text{K}$ to $326^\circ~\text{K}$ for temperature target values, and from -140 m/s to 127 m/s for zonal wind; We bin the errors in a similar way. In the case of geopotential, we bin the targets and errors to the closest 100 $\text{m}^2/\text{s}^2$ value.
+
+Errors are defined as the difference between reconstruction and target, meaning that positive errors correspond to overestimation, and negative errors correspond to underestimation.
+
+Figure \ref{fig:hist2d-err-value} shows the distribution of reconstruction errors made by the hyperprior model at $1000\times$ compression rate, for temperature, zonal wind and geopotential, and for different pressure levels, which is plotted with errors on the abscissa and target values on the ordinate. We observe that when the target value is higher, there are more negative errors, whereas when the target value is lower, there are more positive errors. We also observe that there are diagonal lines with negative slope in the histogram plots. These two observations suggest that the model slightly underestimates higher temperature or wind speed values, and overestimates lower temperature or wind.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth, trim = 4.5cm 6cm 4.5cm 6cm, clip]{figures/experiments/hist/hist_value_vs_err_hyperprior_temperature.pdf}
+    \includegraphics[width=\textwidth, trim = 4.5cm 6cm 4.5cm 6cm, clip]{figures/experiments/hist/hist_value_vs_err_hyperprior_u_component_of_wind.pdf}
+    \includegraphics[width=\textwidth, trim = 4.5cm 6cm 4.5cm 6cm, clip]{figures/experiments/hist/hist_value_vs_err_hyperprior_geopotential.pdf}
+    \hfill
+    \caption{Two-dimensional histograms of reconstruction errors vs. ground truth values for the hyperprior model with $1000\times$ compression rate. Rows correspond to temperature, zonal wind and geopotential, columns correspond to different pressure levels: 50 hPa, 100 hPa, 150 hPa, 500 hPa, 850 hPa and 1000 hPa. For visibility, we plot $\log(\text{hist}+1)$ to highlight low counts.}
+    \label{fig:hist2d-err-value}
+\end{figure}
+
+\subsection{ERA5 data anomalies at low pressure levels}
+\label{sx:appendix:artefacts}
+
+Figure \ref{fig:generalisation-time-50hPa}, shows the RMSE (averaged over HEALPix squares, hours of the days and days of the month, as well as a yearly rolling average) for 4 variables, of the hyperprior model with $1000\times$ compression ratio, evaluated on the 50 hPa pressure level. We notice that there is a spike in RMSE for temperature, zonal wind speed and specific humidity at 50 hPa in December 2020, which seem to confirm the observations about data artefacts at 50 hPa that are discussed in Section \ref{sx:discuss:limitation-artefacts}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth, trim = 6cm 0cm 5cm 0cm, clip]{figures/experiments/time/time_Hyperprior_rmse_cropped_level50.pdf}
+    \hfill
+    \caption{Plot of the average RMSE over 13 years of the test set, from 1/1/2010 to 31/12/2022, using the hyperprior with $1000\times$ compression rate, and on the 50 hPa pressure level. Columns show temperature, geopotential, zonal wind speed and specific humidity. The blue curve shows the monthly average; the red dashed curve shows the yearly rolling average. We notice how there is a spike in RMSE in December 2020 for temperature, wind speed and specific humidity at 50 hPa, confirming the observation about specific humidity anomalies made in Section \ref{sx:discuss:limitation-artefacts}.}
+    \label{fig:generalisation-time-50hPa}
+\end{figure}
+
+
+We sort the reconstruction errors by value in order to investigate which timestamps and levels present the highest reconstruction errors, and select 31 December 2020 at 0 UTC as one of the worst reconstructions. We notice that at that timestamp, specific humidity at 50 hPa presents something that looks like low-value anomalies over the southern hemisphere (top two rows, left column of Figs. \ref{fig:max_err_specific_humidity_hyperprior} and \ref{fig:max_err_specific_humidity_vqvae}). Elsewhere in the literature it has been confirmed that ERA5 presents records with negative specific humidity\footnote{\url{https://forum.ecmwf.int/t/era5-lat-lon-pressure-negative-specific-humidity/2028}} and the GraphCast model evaluated on ERA5 performed worse at the 50 hPa level \citep{lam2023graphcast}. The hyperprior model does not manage to reproduce that low-value anomaly (see top two rows, center and right column of Fig. \ref{fig:max_err_specific_humidity_hyperprior}), generating instead high value artefacts, while the VQ-VAE can (see top two rows, centre and right columns of Fig. \ref{fig:max_err_specific_humidity_vqvae}). Furthermore, we see that the hyperprior fails to reconstruct temperature at that same timestamp of 31 December 2020 at 0 UTC and at pressure level 50 hPa (see how the middle two rows of Fig. \ref{fig:max_err_specific_humidity_hyperprior} show a localised reconstruction artefact appearing at the same location as the reconstruction artefact that appeared in reconstructions of specific humidity), whereas the VQ-VAE manages to reconstruct these data (see equivalent rows on Fig. \ref{fig:max_err_specific_humidity_vqvae}). 
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth, trim = 6cm 2cm 5cm 4.5cm, clip]{figures/experiments/error/2020_12_31-0_HyperPrior_specific_humidity_50hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3cm, clip]{figures/experiments/error/2020_12_31-0_HyperPrior_specific_humidity_zoom_50hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2.5cm 5cm 4.5cm, clip]{figures/experiments/error/2020_12_31-0_HyperPrior_temperature_50hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3cm, clip]{figures/experiments/error/2020_12_31-0_HyperPrior_temperature_zoom_50hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2cm 5cm 4.5cm, clip]{figures/experiments/error/2020_12_31-0_HyperPrior_specific_humidity_100hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3cm, clip]{figures/experiments/error/2020_12_31-0_HyperPrior_specific_humidity_zoom_100hPa.pdf}
+    \hspace*{-2em}
+    \caption{Analysis of the error maxima for hyperprior reconstructions on 2020/12/31 at 00:00 UTC. Top 2 rows show plots of specific humidity at 50hPa (global plot and zoom over the area with a large artefact of low specific humidity, over the southern Pacific near the coast of Chile). Middle 2 rows show plots of temperature at 50 hPa (global and zoom over the artefact area and reconstruction errors). Bottom two rows show reconstructions, without artefacts, of specific humidity at 100 hPa.}
+    \label{fig:max_err_specific_humidity_hyperprior}
+\end{figure}
+
+Finally, the bottom two rows of Figure \ref{fig:max_err_specific_humidity_hyperprior} show that for the same timestamp (31 December 2020 at 0 UTC), but a different pressure level (100 hPa), there is no low-value anomaly in specific humidity, and the weighted MAE is lower ($2.9 \times 10^{-8}$ vs. $7.4 \times 10^{-8}$).
+
+Data artefacts or anomalies in the ERA5 dataset do not appear solely at 50 hPa. In a previous analysis of another model, we identified another data artefact appearing on specific humidity on 14 March 2012 at 22 UTC and at the 150 hPa pressure level, namely a localised blob over Texas with negative specific humidity values. Figure \ref{fig:max_err_specific_humidity_alt} demonstrates that this time around, it is the 3-block VQ-VAE model that suffers from worse reconstruction than the hyperprior model, and that the hyperprior manages to reconstruct another correlated variable at that same timestamp and pressure level: geopotential (with $MAE = 66.7^\circ$~K for hyperprior, as opposed to 285.8 for VQ-VAE).
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth, trim = 6cm 2.0cm 5cm 4.5cm, clip]{figures/experiments/error/2020_12_31-0_3-VQ-VAE_specific_humidity_50hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3.0cm, clip]{figures/experiments/error/2020_12_31-0_3-VQ-VAE_specific_humidity_zoom_50hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2.0cm 5cm 4.5cm, clip]{figures/experiments/error/2020_12_31-0_3-VQ-VAE_temperature_50hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3.0cm, clip]{figures/experiments/error/2020_12_31-0_3-VQ-VAE_temperature_zoom_50hPa.pdf}
+    \hfill
+    \caption{Analysis of the 3-block VQ-VAE reconstructions of 2020/12/31 at 0 UTC data (same as on Fig. \ref{fig:max_err_specific_humidity_hyperprior}). Top two rows show plots of specific humidity at 50hPa, bottom two rows show plots of temperature at 50 hPa. We show both global plots and plots localised over the southern Pacific near the coast of Chile, highlighting how the artefacts in the specific humidity are ``well'' reconstructed by VQ-VAE, while there are no major reconstruction artefacts of temperature ($\text{MAE}=0.381^\circ$~K).}
+    \label{fig:max_err_specific_humidity_vqvae}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth, trim = 6cm 2.0cm 5cm 4.5cm, clip]{figures/experiments/error/2012_3_14-22_HyperPrior_specific_humidity_150hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3.0cm, clip]{figures/experiments/error/2012_3_14-22_HyperPrior_specific_humidity_zoom_150hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3.0cm, clip]{figures/experiments/error/2012_3_14-22_HyperPrior_geopotential_zoom_150hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 2.0cm 5cm 4.5cm, clip]{figures/experiments/error/2012_3_14-22_3-VQ-VAE_specific_humidity_150hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3.0cm, clip]{figures/experiments/error/2012_3_14-22_3-VQ-VAE_specific_humidity_zoom_150hPa.pdf}
+    \includegraphics[width=\textwidth, trim = 6cm 3.5cm 5cm 3.0cm, clip]{figures/experiments/error/2012_3_14-22_3-VQ-VAE_geopotential_zoom_150hPa.pdf}
+    \hfill
+    \caption{Reconstructions of data from 2012/3/14 at 22 UTC with an artefact in specific humidity at 150 hPa, localised over Texas. Top three rows show reconstructions using a hyperprior model, bottom three rows show reconstructions using 3-block VQ-VAEs.}
+    \label{fig:max_err_specific_humidity_alt}
+\end{figure}

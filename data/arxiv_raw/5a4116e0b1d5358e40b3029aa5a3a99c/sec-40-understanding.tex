@@ -1,0 +1,79 @@
+
+
+
+\section{Understanding the TopK activation function}
+
+
+\subsection{TopK prevents activation shrinkage}
+\label{sec:shrinkage}
+
+A major drawback of the \Lone  penalty is that it tends to shrink all activations toward zero \citep{tibshirani1996regression}.
+Our proposed TopK activation function prevents activation shrinkage, as it entirely removes the need for an \Lone penalty.
+To empirically measure the magnitude of activation shrinkage, we consider whether different (and potentially larger) activations would result in better reconstruction given a fixed decoder. We first run the encoder to obtain a set of activated latents, save the sparsity mask, and then optimize only the nonzero values to minimize MSE.\footnote{unlike the ``inference-time optimization'' procedure in \cite{nanda2024progress}} This refinement method has been proposed multiple times such as in $k$-SVD \citep{aharon2006k}, the relaxed Lasso \citep{meinshausen2007relaxed}, or ITI \citep{maleki2009coherence}. We solve for the optimal activations with a positivity constraint using projected gradient descent.  %
+
+
+This refinement procedure tends to increase activations in ReLU models on average, but not in TopK models (\autoref{fig:shrinkage}a), which indicates that TopK is not impacted by activation shrinkage.  The magnitude of the refinement is also smaller for TopK models than for ReLU models.  In both ReLU and TopK models, the refinement procedure noticeably improves the reconstruction MSE (\autoref{fig:shrinkage}b), and the downstream next-token-prediction cross-entropy (\autoref{fig:shrinkage}c). %
+However, this refinement only closes part of the gap between ReLU and TopK models.
+
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.32\textwidth]{figures/plot_refinement_distribution.pdf}
+    \includegraphics[width=0.32\textwidth]{figures/plot_activation_refinement_mse_vs_L0.pdf}
+    \includegraphics[width=0.32\textwidth]{figures/plot_activation_refinement_delta_cross_entropy_vs_L0.pdf}
+    \caption{Latent activations can be refined to improve reconstruction from a frozen set of latents.  For ReLU autoencoders, the refinement is biased toward positive values, consistent with compensating for the shrinkage caused by the \Lone penalty. For TopK autoencoders, the refinement is not biased, and also smaller in magnitude. The refinement only closes part of the gap between ReLU and TopK.}
+    \label{fig:shrinkage}
+\end{figure}
+
+
+\subsection{Comparison with other activation functions}
+\label{sec:benchmark}
+
+Other recent works on sparse autoencoders have proposed different ways to address the \Lone activation shrinkage, and Pareto improve the \Lzero-MSE frontier \citep{wright2024addressing, taggart2024prolu,rajamanoharan2024improving}.  
+\citet{wright2024addressing} propose to fine-tune a scaling parameter per latent, to correct for the \Lone activation shrinkage.
+In Gated sparse autoencoders  \citep{rajamanoharan2024improving}, the selection of which latents are active is separate from the estimation of the activation magnitudes. This separation allows autoencoders to better estimate the activation magnitude, and avoid the \Lone activation shrinkage.
+Another approach is to replace the ReLU activation function with a ProLU \citep{taggart2024prolu} (also known as TRec \citep{konda2014zero}, or JumpReLU \citep{erichson2019jumprelu}), which sets all values below a positive threshold to zero $J_{\theta}(x) = x \cdot \mathbf{1}_{(x > \theta)}$. Because the  parameter $\theta$ is non-differentiable, it requires a approximate gradient such as a ReLU equivalent (ProLU-ReLU) or a straight-through estimator (ProLU-STE) \citep{taggart2024prolu}.
+
+We compared these different approaches in terms of reconstruction MSE, number of active latents \Lzero, and downstream cross-entropy loss (\autoref{fig:relu_vs_topk} and \ref{fig:downstream_loss_benchmark}). We find that they significantly improve the reconstruction-sparsity Pareto frontier, with TopK having the best performance overall.
+
+
+
+\subsection{Progressive recovery}
+\label{sec:testtimek}
+
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.4\linewidth]{figures/plot_test_time_topk_topk.pdf}
+    \includegraphics[width=0.4\linewidth]{figures/plot_test_time_topk_maxk.pdf}
+    \includegraphics[width=0.4\linewidth]{figures/plot_test_time_topk_relu.pdf}
+    \includegraphics[width=0.4\linewidth]{figures/plot_test_time_topk_gatedrelu.pdf}
+    \caption{Sparsity levels can be changed at test time by replacing the activation function with either TopK($k$) or JumpReLU($\theta$), for a given value $k$ or $\theta$. TopK tends to overfit to the value of $k$ used during training, but using Multi-TopK improves generalization to larger $k$.}
+    \label{fig:test_time_k}
+\end{figure}
+
+
+
+
+In a progressive code, a partial transmission still allows reconstructing the signal with reasonable fidelity \citep{skodras2001jpeg}.  For autoencoders, learning a progressive code means that ordering latents by activation magnitude gives a way to progressively recover the original vector. To study this property, we replace the autoencoder activation function (after training) by a TopK($k'$) activation function where $k'$ is different than during training. We then evaluate each value of $k'$ by placing it in the \Lzero-MSE plane (\autoref{fig:test_time_k}).
+
+We find that training with TopK only gives a progressive code up to the value of $k$ used during training. MSE keeps improving for values slightly over $k$ (a result also described in \citep{makhzani2013k}),  then gets substantially worse as $k'$ increases (note that the effect on downstream loss is more muted). This can be interpreted as some sort of overfitting to the value $k$.
+
+\subsubsection{Multi-TopK}
+
+To mitigate this issue, we sum multiple TopK losses with different values of $k$ (Multi-TopK). For example, using $\mathcal{L}(k) + \mathcal{L}(4 k)/8$ is enough to obtain a progressive code over all $k'$
+(note however that training with Multi-TopK does slightly worse than TopK at $k$).
+Training with the baseline ReLU only gives a progressive code up to a value that corresponds to using all positive latents. 
+
+
+
+\subsubsection{Fixed sparsity versus fixed threshold}
+\label{sec:jumprelu}
+
+At test time, the activation function can also be replaced by a JumpReLU activation, which activates above a fixed threshold $\theta$, $J_{\theta}(x) = x \cdot \mathbf{1}_{(x > \theta)}$. In contrast to TopK, JumpReLU leads to a selection of active latents where the number of active latents can vary across tokens.
+Results for replacing the activation function at test-time with a JumpReLU are shown in dashed lines in \autoref{fig:test_time_k}.  
+
+For autoencoders trained with TopK, the test-time TopK and JumpReLU curves are superimposed only for values corresponding to an \Lzero below the training \Lzero, otherwise the JumpReLU activation is worse than the TopK activation. This discrepancy disappears with Multi-TopK, where both curves are nearly superimposed, which means that the model can be used with either a fixed or a dynamic number of latents per token without loss in reconstruction.
+The two curves are also superimposed for autoencoders trained with ReLU.
+Interestingly, it is sometimes more efficient to train a ReLU model with a low \Lone penalty and to use a TopK or JumpReLU at test time, than to use a higher \Lone penalty that would give a similar sparsity level (a result independently described in \citet{nanda2024progress}).

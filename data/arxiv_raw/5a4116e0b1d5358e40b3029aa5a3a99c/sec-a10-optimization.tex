@@ -1,0 +1,148 @@
+\section{Optimization}
+\label{sec:optimization}
+
+
+
+\begin{figure}
+\centering
+    \includegraphics[width=\textwidth]{figures/fig_gpt2sm_LofN.png}
+    \includegraphics[width=\textwidth]{figures/fig_gpt4_LofN.png}
+    
+    \caption{Token budget, MSE, and learning rate power laws, averaged across values of $k$. First row is GPT-2, second row is GPT-4. Note that individual fits are noisy (especially for GPT-4) since learning rate sweeps are coarse, and token budget depends on learning rate.}
+    \label{fig:lr_tok_powerlaws}
+
+\end{figure}
+
+
+
+
+\subsection{Initialization}
+\label{sec:init}
+
+We initialize our autoencoders as follows: 
+
+\begin{itemize}
+\item We initialize the bias $b_{pre}$ to be the geometric median of a sample set of data points, following \citet{bricken2023monosemanticity}.
+\item We initialize the encoder directions parallel to the respective decoder directions, so that the corresponding latent read/write directions are the same\footnote{This is done only at initialization; we do not tie the parameters as in \citet{cunningham2023sparse}.  This strategy is also presented in concurrent work \citep{conerly2024update}.} Directions are chosen uniformly randomly.
+\item We scale decoder latent directions to be unit norm at initialization (and also after each training step), following \citet{bricken2023monosemanticity}.
+\item For baseline models we use torch default initialization for encoder magnitudes.  For TopK models, we initialized the magnitude of the encoder such that the magnitude of reconstructed vectors match that of the inputs. However, in our ablations we find this has no effect or a weak negative effect (\autoref{fig:init-ablation}).\footnote{Note that the scaling factor has nontrivial interaction with $n$, and scales between $\Theta(1/\sqrt{k})$ and $\Theta(1/k)$. This scheme has the advantage that is optimal at init in the infinite width limit. We did not try simpler schemes like scaling by $\Theta(1/\sqrt{k})$.}
+\end{itemize}
+
+\subsection{Auxiliary loss}
+\label{sec:aux-loss}
+
+
+We define an auxiliary loss (AuxK) similar to ``ghost grads'' \citep{jermyn2024ghost} that models the reconstruction error using the top-$k_{\text{aux}}$ dead latents (typically $k_{\text{aux}} = 512$). Latents are flagged as dead during training if they have not activated for some predetermined number of tokens (typically 10 million). Then, given the reconstruction error of the main model $e = x - \hat{x}$, we define the auxiliary loss $\mathcal{L}_\text{aux} = ||e - \hat{e}||^2_2$, where $\hat{e} = W_\text{dec} z$ is the reconstruction using the top-$k_{\text{aux}}$ dead latents.
+The full loss is then defined as $\mathcal{L} + \alpha \mathcal{L}_\text{aux}$, where $\alpha$ is a small coefficient (typically $1/32$). 
+Because the encoder forward pass can be shared (and dominates decoder cost and encoder backwards cost, see \autoref{sec:systems}), adding this auxiliary loss only increases the computational cost by about 10\%.
+
+We found that the AuxK loss very occasionally NaNs at large scale, and zero it when it is NaN to prevent training run collapse.
+
+\subsection{Optimizer}
+
+We use the Adam optimizer \citep{kingma2014adam} with $\beta_1 = 0.9$ and $\beta_2 = 0.999$, and a constant learning rate.  We tried several learning rate decay schedules but did not find consistent improvements in token budget to convergence. We also did not find major benefits from tuning $\beta_1$ and $\beta_2$.
+
+We project away gradient information parallel to the decoder vectors, to account for interaction between Adam and decoder normalization, as described in \citet{bricken2023monosemanticity}.
+
+\subsubsection{Adam epsilon}
+
+By convention, we average the gradient across the batch dimension. As a result, the root mean square (RMS) of the gradient can often be very small, causing Adam to no longer be loss scale invariant.%
+We find that by setting epsilon sufficiently small, these issues are prevented, and that $\varepsilon$ is otherwise not very sensitive and does not result in significant benefit to tune further. We use $\varepsilon = 6.25 \times 10^{-10}$ in many experiments in this paper, though we reduced it further for some of the largest runs to be safe.%
+\subsubsection{Gradient clipping}
+
+When scaling the GPT-4 autoencoders, we found that gradient clipping was necessary to prevent instability and divergence at higher learning rates. %
+We found that gradient clipping substantially affected $L(C)$ but not $L(N)$. We did not use gradient clipping for the GPT-2 small runs.
+
+\subsection{Batch size}
+\label{sec:batch_size_invariance}
+
+Larger batch sizes are critical for allowing much greater parallelism. Prior work tends to use batch sizes like 2048 or 4096 tokens \citep{bricken2023monosemanticity, conerly2024update, rajamanoharan2024improving}. To gain the benefits of parallelism, we use a batch size of 131,072 tokens for most of our experiments.  %
+
+While batch size affects $L(C)$ substantially, we find that the $L(N)$ loss does not depend strongly on batch size when optimization hyperparameters are set appropriately (\autoref{fig:bs-scaling}).
+
+ 
+
+
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/fig_gpt2sm_bs.png}
+    \caption{With correct hyperparameter settings, different batch sizes converge to the same $L(N)$ loss (gpt2small).}
+    \label{fig:bs-scaling}
+\end{figure}
+
+
+
+
+
+\subsection{Weight averaging}
+
+We find that keeping an exponential moving average (EMA) \cite{ruppert1988efficient} of the weights slightly reduces sensitivity to learning rate by allowing slightly higher learning rates to be tolerated. Due to its low cost, we use EMA in all experiments. We use an EMA coefficient of 0.999, and did not find a substantial benefit to tuning it.
+
+We use a bias-correction similar to that used in \citet{kingma2014adam}. Despite this, the early steps of EMA are still generally worse than the original model. Thus for the $L(C)$ experiments, we take the min of the EMA model's and non-averaged model's validation losses.
+
+
+
+
+
+\subsection{Other details}
+
+\begin{itemize}
+    \item For the main MSE loss, we compute an MSE normalization constant once at the beginning of training, and do not do any loss normalization per batch.
+    \item For the AuxK MSE loss, we compute the normalization per token, because the scale of the error changes throughout training.
+    \item In theory, the $b_{\text{pre}}$ lr should be scaled linearly with the norm of the data to make the autoencoder completely invariant to input scale. In practice, we find it to tolerate an extremely wide range of values with little impact on quality.
+    \item Anecdotally, we noticed that when decaying the learning rate of an autoencoder previously training at the L(C) loss, the number of dead latents would decrease.
+\end{itemize}
+
+
+
+\section{Other training details}
+\label{sec:training-details}
+
+Unless otherwise noted, autoencoders were trained on the residual activation directly after the layernorm (with layernorm weights folded into the attention weights), since this corresponds to how residual stream activations are used. This also causes importance of input vectors to be uniform, rather than weighted by norm\footnote{We believe one of the main impacts of normalizing is that it the first token positions are downweighted in importance (see \autoref{sec:token_position} for more discussion).}. 
+\subsection{TopK training details}
+
+
+We select $k_\text{aux}$ as a power of two close to $\frac{d_{model}}{2}$ (e.g. 512 for GPT-2 small). We typically select $\alpha = 1 / 32$. We find that the training is generally not extremely sensitive to the choice of these hyperparameters.
+
+We find empirically that using AuxK eliminates almost all dead latents by the end of training.
+
+Unfortunately, because of compute constraints, we were unable to train our 16M latent autoencoder to $L(N)$, which made it not possible to include the 16M as part of a consistent $L(N)$ series.
+
+\subsection{Baseline hyperparameters}
+\label{sec:baseline-relu}
+Baseline ReLU autoencoders were trained on GPT-2 small, layer 8. 
+We sweep learning rate in [5e-5, 1e-4, 2e-4, 4e-4], \Lone coefficient in [1.7e-3, 3.1e-3, 5e-3, 1e-2, 1.7e-2] and train for 8 epochs of 6.4 billion tokens at a batch size of 131072. We try different resampling periods in [12.5k, 25k] steps, and choose to resample 4 times throughout training. We consider a feature dead if it does not activate for 10 million tokens. 
+
+For Gated SAE \citep{rajamanoharan2024improving}, we sweep \Lone coefficient in [1e-3, 2.5e-3, 5e-3, 1e-2, 2e-2], learning rate in [2.5e-5, 5e-5, 1e-4], train for 6 epochs of 6.4 billion tokens at a batch size of 131072. We resample 4 times throughout training.
+
+For ProLU autoencoders \citep{taggart2024prolu}, we sweep \Lone coefficient in [5e-4, 1e-3, 2.5e-3, 5e-3, 1e-2, 2e-2], learning rate in [2.5e-5, 5e-5, 1e-4], train for 6 epochs of 6.4 billion tokens at a batch size of 131072. We resample 4 times throughout training. For the ProLU gradient, we try both ProLU-STE and ProLU-ReLU.  %
+Note that, consistent with the original work, ProLU-STE autoencoders all have $L_0 < 25$, even for small \Lone coefficients.
+
+We used similar settings and sweeps for autoencoders trained on GPT-4.
+Differences include: replacing the resampling of dead latents with a \Lone coefficient warm-up over 5\% of training \citep{conerly2024update}; removing the decoder unit-norm constraint and adding the decoder norm in the \Lone penalty \citep{conerly2024update}.
+
+Our baselines generally have few dead latents, similar or less than our TopK models (see \autoref{fig:baselines_dead_ratio}).  
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\textwidth]{figures/plot_gpt4_delta_cross_entropy_mse.pdf}%
+    \caption{For a fixed sparsity level ($L_0 = 128$), a given MSE leads to a lower downstream-loss for TopK than for other activations functions. (GPT-4). We are less confident about these runs than the corresponding ones for GPT-2, yet the results are consistent (see \autoref{fig:downstream_loss_benchmark}).}
+    \label{fig:downstream_loss_benchmark_gpt4}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.45\textwidth}
+    \includegraphics[width=\textwidth]{placeholders/dead_ratio_gpt2.png}%
+    \caption{Dead latent ratios for GPT-2}
+    \end{subfigure}
+    \hspace{10pt}
+    \begin{subfigure}[b]{0.45\textwidth}
+    \includegraphics[width=\textwidth]{placeholders/dead_ratio_gpt4.png}%
+     \caption{Dead latent ratios for GPT-4}
+     \end{subfigure}
+     \caption{Our baselines generally have few dead latents, similar or less than our TopK models.}
+    \label{fig:baselines_dead_ratio}
+\end{figure}

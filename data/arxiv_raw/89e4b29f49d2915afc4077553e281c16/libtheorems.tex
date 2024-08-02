@@ -1,0 +1,47 @@
+\usepackage{etoolbox}
+
+\makeatletter
+
+\newcommand{\define}[4][ignore]{%
+  \ifstrequal{#1}{ignore}{}{
+  \@namedef{thmtitle@#2}{#1}}%
+  \@namedef{thm@#2}{#4}%
+  \@namedef{thmtypen@#2}{lemma}%
+  \newtheorem{thmtype@#2}[theorem]{#3}%
+  \newtheorem*{thmtypealt@#2}{#3~\ref{#2}}%
+}
+
+\newcommand{\state}[1]{%
+  \@namedef{curthm}{#1}
+  \@ifundefined{thmtitle@#1}{
+  \begin{thmtype@#1}
+    }{
+  \begin{thmtype@#1}[\@nameuse{thmtitle@#1}]
+  }
+    \label{#1}
+    \@nameuse{thm@#1}
+  \end{thmtype@#1}
+  \@ifundefined{thmdone@#1}{
+  \@namedef{thmdone@#1}{stated}%
+  }{}
+}
+
+\newcommand{\restate}[1]{%
+  \@namedef{curthm}{#1}
+  \@ifundefined{thmtitle@#1}{
+    \begin{thmtypealt@#1}
+    }{
+  \begin{thmtypealt@#1}[\@nameuse{thmtitle@#1}]
+  }
+    \@nameuse{thm@#1}
+  \end{thmtypealt@#1}
+  \@ifundefined{thmdone@#1}{
+  \@namedef{thmdone@#1}{stated}%
+  }{}
+}
+
+\newcommand{\thmlabel}[1]{
+  \@ifundefined{thmdone@\@nameuse{curthm}}{\label{#1}
+    }{\tag*{\eqref{#1}}}
+}
+\makeatother

@@ -1,0 +1,93 @@
+Figure~\ref{fig:vq} shows the detailed network diagram of the VQ-GAN model, alongside details of the convolutional networks used for encoding and decoding and the patch discriminator of the GAN.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[t]{.6\textwidth}
+        \centering
+        \includegraphics[height=2.5in]{figures/networks/vqgan.pdf}
+        \caption{Overview\label{fig:vq:vqgan}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{.29\textwidth}
+        \centering
+        \includegraphics[height=2.5in]{figures/networks/vq_discriminator.pdf}
+        \caption{Patch discriminator\label{fig:vq:discriminator}}
+    \end{subfigure}
+    \par\bigskip % some vertical space
+    \begin{subfigure}[c]{.3\textwidth}
+        \centering
+        \includegraphics[height=2in]{figures/networks/vq_encoder.pdf}
+        \caption{Encoder \label{fig:vq:enc}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[c]{.3\textwidth}
+        \centering
+        \includegraphics[height=2in]{figures/networks/vq_encoder_initial_layers.pdf}
+        \caption{Initial layers \label{fig:vq:enc:initial_layers}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[c]{.3\textwidth}
+        \centering
+        \includegraphics[height=2in]{figures/networks/vq_block_group.pdf}
+        \caption{Block group \label{fig:vq:enc:block_group}}
+    \end{subfigure}
+    % \hfill
+    \par\bigskip % some vertical space
+    \begin{subfigure}[c]{.3\textwidth}
+        \centering
+        \includegraphics[height=2in]{figures/networks/vq_encoder_final_layers.pdf}
+        \caption{Final layers \label{fig:vq:enc:final_layers}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[c]{0.3\textwidth}
+        \centering
+        \includegraphics[height=2in]{figures/networks/vq_resnet_block.pdf}
+        \caption{ResNet block (for mid layers)\label{fig:vq:enc:mid:resnet_block}}
+    \end{subfigure}
+    \hfill %\hspace{1in}
+    \begin{subfigure}[c]{0.3\textwidth}
+        \centering
+        \includegraphics[height=2in]{figures/networks/vq_final_layers_resnet_block.pdf}
+        \caption{ResNet block (for initial and final layers)\label{fig:vq:enc:final:resnet_block}}
+    \end{subfigure}
+    %\hfill    
+    \caption{The VQ-GAN network, showing the encoder pathway in detail as well as the GAN discriminator. For the decoder, the upsampling convolution in fig.~\ref{fig:vq:enc:block_group} first upsamples by $2\times$ using nearest-neighbor sampling, then applies a stride-1 conventional convolution, not a transposed convolution. For the decoder, the initial (fig~\ref{fig:vq:enc:initial_layers}) and final (fig~\ref{fig:vq:enc:final_layers}) layers loop through the ResNet-attention block (dotted rectangle) three times, not twice as shown for the encoder. The ``Attention'' module denotes an all-to-all attention layer. 
+    \label{fig:vq}}
+\end{figure}
+
+
+Figure~\ref{fig:balle} shows the network diagram of the hyperprior model, alongside details of the convolutional networks used for encoding and decoding.
+%
+\begin{figure}
+    \centering
+    %\hfill
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=.6\textwidth]{figures/networks/hyperprior_horizontal.pdf}
+        \caption{The hyperprior network, which contains a factorized prior network (dashed rectangle). C, the number of input channels, varies by dataset and conditioning. The surface dataset has 4 channels, the vertical level dataset has 5. Conditioning adds 6 channels. N, the codebook size, varies from 512 to 8192 depending on the experiment.}
+    \end{subfigure}
+    %\hfill
+    %\newline
+    \par\bigskip % some vertical space
+    \hfill
+    \begin{subfigure}[b]{.3\textwidth}
+        \centering
+        \includegraphics[height=3in]{figures/networks/balle_fp_encoder.pdf}
+        \caption{FP encoder\label{fig:balle:fp_encoder}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \includegraphics[height=3in]{figures/networks/balle_hp_encoder.pdf}
+        \caption{HP encoder\label{fig:balle:hp_encoder}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \includegraphics[height=2in]{figures/networks/balle_encoder_resnet_block.pdf}
+        \vspace{.4in}
+        \caption{Encoder ResNet block\label{fig:balle:resnet}}
+    \end{subfigure}
+    \hfill
+    \caption{Hyperprior network architecture. Yellow: parameterized (learned) operations. Trapezoids: resizing operations. Fig~\ref{fig:balle:fp_encoder}~to~\ref{fig:balle:resnet} show the encoder sub-networks. To get their decoder analogues, replace conv with deconv operations, and reverse the arrows, and in fig~\ref{fig:balle:resnet}, swap the split~($\bullet$) and  sum~($\oplus$) nodes. Convolutions and deconvolutions are 2D, using kernels with spatial dimensions of 3x3. Downsampling convolutions use a stride length of 2. Upsampling deconvolutions upscale the input by a factor of 2 using nearest-neighbor sampling, then deconvolve with a stride of 1. The FiLM operation is conditioned on elevation level, but this conditioning input is omitted for visual clarity.\label{fig:balle}}
+\end{figure}

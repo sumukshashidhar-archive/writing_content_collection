@@ -1,0 +1,200 @@
+\section{Improved techniques for consistency training}\label{sec:method}
+
+Below we re-examine the design choices of CT in \citet{song2023consistency} and pinpoint modifications that improve its performance, which we summarize in \cref{tab:params}. We focus on CT without learned metric functions. For our experiments, we employ the Score SDE architecture in \citet{song2021scorebased} and train the consistency models for 400,000 iterations on the CIFAR-10 dataset \citep{krizhevsky2014cifar} without class labels. While our primary focus remains on CIFAR-10 in this section, we observe similar improvements on other datasets, including ImageNet $64\times 64$ \citep{deng2009imagenet}. We measure sample quality using Fr\'echet Inception Distance (FID) \citep{heusel2017gans}.
+
+
+
+
+\begin{table}
+    \caption{Comparing the design choices for CT in \citet{song2023consistency} versus our modifications. %
+    }\label{tab:params}
+    \begin{adjustbox}{width=\linewidth}
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{@{}p{0.28\linewidth}|l|l@{\hspace*{-2ex}}}
+        \Xhline{2\arrayrulewidth}
+        & {\bf Design choice in \citet{song2023consistency}} & {\bf Our modifications} \\
+        \hline
+        EMA decay rate for the teacher network & $\mu(k) = \exp(\frac{s_0 \log \mu_0}{N(k)})$ & $\mu(k) = 0$ \\
+        Metric in consistency loss & $d(\vx,\vy) = \operatorname{LPIPS}(\vx, \vy)$ & $d(\vx, \vy) = \sqrt{\norm{\vx - \vy}_2^2 + c^2} - c$ \\
+        Discretization curriculum & \pbox[t][8ex]{\linewidth}{ $N(k)=$\\ \hphantom{ww} $\Big\lceil \sqrt{\frac{k}{K}((s_1 + 1)^2 - s_0^2) + s_0^2}-1 \Big \rceil + 1$} & \pbox[t][8ex]{\linewidth}{$N(k) = \min( s_0 2^{\lfloor \frac{k}{K'} \rfloor}, s_1) + 1$, \\\hphantom{wwwwwwww} where $K' = \Big\lfloor \frac{K}{\log_2 \lfloor s_1 / s_0 \rfloor + 1} \Big\rfloor$}\\%\pbox[t][8ex]{\linewidth}{ $N(k)=$\\ \hphantom{ww} $\Big\lceil \frac{s_1 + 1 - s_0}{2} [1 - \cos( \frac{\pi k}{K}) ] + s_0 - 1 \Big\rceil + 1$} \\
+        Noise schedule & $\sigma_i$, where $i \sim \mcal{U}\llbracket 1, N(k)-1 \rrbracket$ & \pbox[t][8ex]{\linewidth}{ $\sigma_i$, where $i \sim p(i)$, and $p(i) \propto$ \\ \hphantom{w} $\operatorname{erf}\big(\frac{\log(\sigma_{i+1}) - P_\text{mean}}{\sqrt{2}P_\text{std}}\big) - \operatorname{erf}\big(\frac{\log(\sigma_i) - P_\text{mean}}{\sqrt{2}P_\text{std}}\big)$} \\
+        Weighting function & $\lambda(\sigma_i) = 1$ & $\lambda (\sigma_i) = \frac{1}{\sigma_{i+1} - \sigma_i}$ \\
+        \hline\hline
+        \multirow{5}{*}[-0.8ex]{Parameters} & $s_0 = 2, s_1=150, \mu_0=0.9$ on CIFAR-10 & $s_0=10, s_1=1280$\\
+        & $s_0 = 2, s_1 = 200, \mu_0=0.95$ on ImageNet $64\times 64$ & $c=0.00054 \sqrt{d}$, $d$ is data dimensionality\\
+        & & $P_\text{mean}=-1.1, P_\text{std}=2.0$\\\cline{2-3}
+        & \multicolumn{2}{c}{$k \in \llbracket 0, K \rrbracket$, where $K$ is the total training iterations}\\
+        & \multicolumn{2}{c}{$\sigma_i = (\sigma_\text{min}^{1/\rho} + \frac{i-1}{N(k)-1}(\sigma_\text{max}^{1/\rho} - \sigma_\text{min}^{1/\rho}))^\rho$, where $i \in \llbracket 1, N(k) \rrbracket, \rho = 7, \sigma_\text{min}=0.002, \sigma_\text{max}=80$}\\
+        \Xhline{2\arrayrulewidth}
+    \end{tabular}
+    \renewcommand{\arraystretch}{1}
+    \end{adjustbox}
+    \vspace{-1em}
+\end{table}
+
+\subsection{Weighting functions, noise embeddings, and dropout}\label{sec:improvements}
+
+
+We start by exploring several hyperparameters that are known to be important for diffusion models, including the weighting function $\lambda(\sigma)$, the embedding layer for noise levels, and dropout \citep{ho2020denoising,song2021scorebased,dhariwal2021diffusion,Karras2022edm}. We find that proper selection of these hyperparameters greatly improve CT when using the squared $\ell_2$ metric.
+
+
+
+The default weighting function in \citet{song2023consistency} is uniform, \ie, $\lambda(\sigma) \equiv 1$. This assigns equal weights to consistency losses at all noise levels, which we find to be suboptimal. We propose to modify the weighting function so that it reduces as noise levels increase. The rationale is that errors from minimizing consistency losses in smaller noise levels can influence larger ones and therefore should be weighted more heavily. Specifically, our weighting function (\cf, \cref{tab:params}) is defined as $\lambda(\sigma_i) = \frac{1}{\sigma_{i+1} - \sigma_i}$. The default choice for $\sigma_i$, given in \cref{sec:background}, ensures that $\lambda(\sigma_i) = \frac{1}{\sigma_{i+1} - \sigma_i}$ reduces monotonically as $\sigma_i$ increases, thus assigning smaller weights to higher noise levels. As shown in \cref{fig:improved_baselines}, this refined weighting function notably improves the sample quality in CT with the squared $\ell_2$ metric.
+
+In \citet{song2023consistency}, Fourier embedding layers \citep{tancik2020fourier} and positional embedding layers \citep{vaswani2017attention} are used to embed noise levels for CIFAR-10 and ImageNet $64\times 64$ respectively. %
+It is essential that noise embeddings are sufficiently sensitive to minute differences to offer training signals, yet too much sensitivity can lead to training instability. As shown in \cref{fig:ctct}, high sensitivity can lead to the divergence of continuous-time CT \citep{song2023consistency}. This is a known challenge in \citet{song2023consistency}, which they circumvent by initializing the consistency model with parameters from a pre-trained diffusion model. In \cref{fig:ctct}, we show continuous-time CT on CIFAR-10 converges with random initial parameters, provided we use a less sensitive noise embedding layer with a reduced Fourier scale parameter, as visualized in \cref{fig:fourier_sensitivity}. %
+For discrete-time CT, models are less affected by the sensitivity of the noise embedding layers, but as shown in \cref{fig:improved_baselines}, reducing the scale parameter in Fourier embedding layers from the default value of 16.0 to a smaller value of 0.02 still leads to slight improvement of FIDs on CIFAR-10. For ImageNet models, we employ the default positional embedding, as it has similar sensitivity to Fourier embedding with scale 0.02 (see \cref{fig:fourier_sensitivity}). %
+
+Previous experiments with consistency models in \citet{song2023consistency} always employ zero dropout, motivated by the fact that consistency models generate samples in a single step, unlike diffusion models that do so in multiple steps. Therefore, it is intuitive that consistency models, facing a more challenging task, would be less prone to overfitting and need less regularization than their diffusion counterparts. Contrary to our expectations, we discovered that using larger dropout than diffusion models improves the sample quality of consistency models. Specifically, as shown in \cref{fig:improved_baselines}, a dropout rate of 0.3 for consistency models on CIFAR-10 obtains better FID scores. For ImageNet $64\times 64$, we find it beneficial to apply dropout of 0.2 to layers with resolution less than or equal to $16\times 16$, following \citet{hoogeboom2023simple}. We additionally ensure that the random number generators for dropout share the same states across the student and teacher networks when optimizing the CT objective in \cref{eq:ct-loss}.
+
+By choosing the appropriate weighting function, noise embedding layers, and dropout, we significantly improve the sample quality of consistency models using the squared $\ell_2$ metric, closing the gap with the original CT in \citet{song2023consistency} that relies on LPIPS (see \cref{fig:improved_baselines}). Although our modifications do not immediately improve the sample quality of CT with LPIPS, combining with additional techniques in \cref{sec:noema} will yield significant improvements for both metrics.
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.336\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/fourier_sensitivity.png}
+        \caption{Sensitivity of noise embeddings.}\label{fig:fourier_sensitivity}
+    \end{subfigure}%
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ctct.png}
+        \caption{Continuous-time CT.}\label{fig:ctct}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/improved_baselines.png}
+        \caption{Ablation study.}\label{fig:improved_baselines}
+    \end{subfigure}
+    \caption{(a) As the Fourier scale parameter decreases, Fourier noise embeddings become less sensitive to minute noise differences. This sensitivity is closest to that of positional embeddings when the Fourier scale is set to 0.02. (b) Continuous-time CT diverges when noise embeddings are overly sensitive to minor noise differences. (c) An ablation study examines the effects of our selections for weighting function ($\frac{1}{\sigma_{i+1} - \sigma_i}$), noise embedding (Fourier scale $= 0.02$), and dropout ($=0.3$) on CT using the squared $\ell_2$ metric. Here baseline models for both metrics follow configurations in \citet{song2023consistency}. All models are trained on CIFAR-10 without class labels.}\label{fig:improved}
+\end{figure}
+\subsection{Removing EMA for the teacher network}\label{sec:noema}
+
+When training consistency models, we minimize the discrepancy between models evaluated at adjacent noise levels. Recall from \cref{sec:background} that the model with the lower noise level is termed the \emph{teacher network}, and its counterpart the \emph{student network}. While \citet{song2023consistency} maintains EMA parameters for both networks with potentially varying decay rates, we present a theoretical argument indicating that the EMA decay rate for the teacher network should always be zero for CT, although it can be nonzero for CD. We revisit the theoretical analysis in \citet{song2023consistency} to support our assertion and provide empirical evidence that omitting EMA from the teacher network in CT notably improves the sample quality of consistency models.
+
+
+To support the use of CT, \citet{song2023consistency} present two theoretical arguments linking the CT and CM objectives as $N \to \infty$. The first line of reasoning, which we call Argument (i), draws upon Theorem 2 from \citet{song2023consistency} to show that under certain regularity conditions, $\mcal{L}_\text{CT}^N(\vtheta, \vtheta^{-}) = \mcal{L}^N(\vtheta, \vtheta^-) + o(\Delta \sigma)$. That is, when $N \to \infty$, we have $\Delta \sigma \to 0$ and hence $\mcal{L}_\text{CT}^N(\vtheta, \vtheta^{-})$ converges to $\mcal{L}^N(\vtheta, \vtheta^-)$ asymptotically. The second argument, called Argument (ii), is grounded in Theorem 6 from \citet{song2023consistency} which asserts that when $\vtheta^{-} = \vtheta$, both $\lim_{N\to \infty}(N-1) \nabla_\vtheta \mcal{L}^N(\vtheta, \vtheta^{-})$ and $\lim_{N\to \infty}(N-1) \nabla_\vtheta \mcal{L}^N_\text{CT}(\vtheta, \vtheta^{-})$ are well-defined and identical. This suggests that after scaling by $N-1$, gradients of the CT and CM objectives match in the limit of $N \to \infty$, leading to equivalent training dynamics. Unlike Argument (i), Argument (ii) is valid only when $\vtheta^{-} = \vtheta$, which can be enforced by setting the EMA decay rate $\mu$ for the teacher network to zero in \cref{eq:ema}.
+
+
+We show this inconsistency in requirements for Argument (i) and (ii) to hold is caused by flawed theoretical analysis of the former. Specifically, Argument (i) fails if $\lim_{N \to \infty}\mcal{L}^N(\vtheta, \vtheta^{-})$ is not a valid objective for learning consistency models, which we show can happen when $\vtheta^{-} \neq \vtheta$. To give a concrete example, consider a data distribution $p_\text{data}(x) = \delta(x - \xi)$, which leads to $p_\sigma(x) = \mcal{N}(x; \xi, \sigma^2)$ and a ground truth consistency function $f^*(x, \sigma) = \frac{\sigma_\text{min}}{\sigma}x + \left(1 - \frac{\sigma_\text{min}}{\sigma}\right)\xi$. Let us define the consistency model as $f_\theta(x, \sigma) = \frac{\sigma_\text{min}}{\sigma}x + \left(1 - \frac{\sigma_\text{min}}{\sigma}\right)\theta$. In addition, let $\sigma_i = \sigma_\text{min} + \frac{i-1}{N-1}(\sigma_\text{max} - \sigma_\text{min})$ for $i \in \llbracket 1, N \rrbracket$ be the noise levels, where we have $\Delta \sigma = \frac{\sigma_\text{max} - \sigma_\text{min}}{N-1}$. Given $z\sim \mcal{N}(0, 1)$ and $x_{\sigma_{i+1}} = \xi + \sigma_{i+1} z$, it is straightforward to show that $\breve{x}_{\sigma_i} = x_{\sigma_{i+1}} - \sigma_{i+1}(\sigma_i - \sigma_{i+1}) \nabla_x \log p_\sigma(x_{\sigma_{i+1}})$ simplifies to $\check{x}_{\sigma_i} = \xi + \sigma_i z$. As a result, the objectives for CM and CT align perfectly in this toy example. Building on top of this analysis, the following result proves that $\lim_{N \to \infty}\mcal{L}^N(\theta, \theta^{-})$ here is not amenable for learning consistency models whenever $\theta^{-} \neq \theta$.%
+\begin{proposition}\label{prop}
+    Given the notations introduced earlier, and using the uniform weighting function $\lambda(\sigma) = 1$ along with the squared $\ell_2$ metric, we have
+    \begin{gather}
+        \lim_{N \to \infty}\mcal{L}^N(\theta, \theta^-) = \lim_{N \to \infty}\mcal{L}^N_\text{CT}(\theta, \theta^-) = \mbb{E}\Big[ \big(1 - \frac{\sigma_\text{min}}{\sigma_i} \big)^2(\theta - \theta^{-})^2\Big]\quad \text{if $\theta^{-} \neq \theta$}\label{eq:limit}\\
+        \lim_{N \to \infty}\frac{1}{\Delta \sigma} \frac{\ud \mcal{L}^N(\theta, \theta^{-})}{\ud \theta} = \begin{cases}
+            \frac{\ud}{\ud\theta} \mbb{E}\Big[ \frac{\sigma_\text{min}}{\sigma_i^2}\Big( 1 - \frac{\sigma_\text{min}}{\sigma_i} \Big)(\theta - \xi)^2 \Big], &\quad \theta^{-} = \theta\\
+            +\infty, &\quad \theta^{-} < \theta \\
+            -\infty, &\quad \theta^{-} > \theta \\
+        \end{cases}\label{eq:grad_limit}
+    \end{gather}
+\end{proposition}
+\begin{proof}
+    See \cref{app:proof}.
+\end{proof}
+
+
+
+Recall that typically $\theta^{-} \neq \theta$ when $\mu \neq 0$. In this case, \cref{eq:limit} shows that the CM/CT objective is independent of $\xi$, thus providing no signal of the data distribution and are therefore impossible to train correct consistency models. This directly refutes Argument (i). In contrast, when we set $\mu=0$ to ensure $\theta^{-} = \theta$, \cref{eq:grad_limit} indicates that the gradient of the CM/CT objective, when scaled by $1/\Delta \sigma$, converges to the gradient of the mean squared error between $\theta$ and $\xi$. Optimizing this gradient consequently yields $\theta = \xi$, accurately learning the ground truth consistency function. This analysis is consistent with Argument (ii).
+
+
+
+As illustrated in \cref{fig:noema}, discarding EMA from the teacher network notably improves sample quality for CT across both LPIPS and squared $\ell_2$ metrics. The curves labeled ``Improved'' correspond to CT using the improved design outlined in \cref{sec:improvements}. Setting $\mu(k) = 0$ for all training iteration $k$ effectively counters the sample quality degradation of LPIPS caused by the modifications in \cref{sec:improvements}. Combining the strategies from \cref{sec:improvements} with a zero EMA for the teacher, we are able to match the sample quality of the original CT in \citet{song2023consistency} that necessitates LPIPS, by using simple squared $\ell_2$ metrics.
+
+
+
+\subsection{Pseudo-Huber metric functions}\label{sec:pseudo_huber}
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/noema.png}
+        \caption{LPIPS \& squared $\ell_2$ metrics.}\label{fig:noema}
+    \end{subfigure}%
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/loss_search.png}
+        \caption{$s_0 = 2, s_1 = 150$}
+    \end{subfigure}%
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/loss_search_1280.png}
+        \caption{$s_0 = 10, s_1 = 1280$}\label{fig:loss_search_1280}
+    \end{subfigure}
+    \caption{(a) Removing EMA in the teacher network leads to significant improvement in FIDs. (b, c) Pseudo-Huber metrics significantly improve the sample quality of squared $\ell_2$ metric, and catches up with LPIPS when using overall larger $N(k)$, where the Pseudo-Huber metric with $c=0.03$ is the optimal. All training runs here employ the improved techniques from \cref{sec:improvements,sec:noema}.}\label{fig:loss_search}
+\end{figure}
+
+Using the methods from \cref{sec:improvements,sec:noema}, we are able to improve CT with squared $\ell_2$ metric, matching the original CT in \citet{song2023consistency} that utilizes LPIPS. Yet, as shown in \cref{fig:noema}, LPIPS still maintains a significant advantage over traditional metric functions when the same improved techniques are in effect for all. To address this disparity, we adopt the Pseudo-Huber metric family \citep{charbonnier1997deterministic}, defined as
+\begin{align}
+d(\vx, \vy) = \sqrt{\norm{\vx - \vy}_2^2 + c^2} - c, \label{eq:pseudo_huber}
+\end{align}
+where $c > 0$ is an adjustable constant. As depicted in \cref{fig:pseudo_huber_shape}, Pseudo-Huber metrics smoothly bridge the $\ell_1$ and squared $\ell_2$ metrics, with $c$ determining the breadth of the parabolic section. In contrast to common metrics like $\ell_0$, $\ell_1$, and $\ell_\infty$, Pseudo-Huber metrics are continuously twice differentiable, and hence meet the theoretical requirement for CT outlined in \citet{song2023consistency}.
+
+
+Compared to the squared $\ell_2$ metric, the Pseudo-Huber metric is more robust to outliers as it imposes a smaller penalty for large errors than the squared $\ell_2$ metric does, yet behaves similarly for smaller errors. We posit that this added robustness can reduce variance during training. To validate this hypothesis, we examine the $\ell_2$ norms of parameter updates obtained from the Adam optimizer during the course of training for both squared $\ell_2$ and Pseudo-Huber metric functions, and summarize results in \cref{fig:adam}. Our observations confirm that the Pseudo-Huber metric results in reduced variance relative to the squared $\ell_2$ metric, aligning with our hypothesis.
+
+We evaluate the effectiveness of Pseudo-Huber metrics by training several consistency models with varying $c$ values on CIFAR-10 and comparing their sample quality with models trained using LPIPS and squared $\ell_2$ metrics. We incorporate improved techniques from \cref{sec:improvements,sec:noema} for all metrics. \cref{fig:loss_search} reveals that Pseudo-Huber metrics yield notably better sample quality than the squared $\ell_2$ metric. By increasing the overall size of $N(k)$---adjusting $s_0$ and $s_1$ from the standard values of 2 and 150 in \citet{song2023consistency} to our new values of 10 and 1280 (more in \cref{sec:discretization})---we for the first time surpass the performance of CT with LPIPS on equal footing using a traditional metric function that does not rely on learned feature representations. Furthermore, \cref{fig:loss_search_1280} indicates that $c=0.03$ is optimal for CIFAR-10 images. We suggest that $c$ should scale linearly with $\norm{\vx - \vy}_2$, and propose a heuristic of $c = 0.00054 \sqrt{d}$ for images with $d$ dimensions. Empirically, we find this recommendation to work well on both CIFAR-10 and ImageNet $64\times 64$ datasets.
+
+
+\subsection{Improved curriculum for total discretization steps}\label{sec:discretization}
+
+
+As mentioned in \cref{sec:noema}, CT's theoretical foundation holds asymptotically as $N \to \infty$. In practice, we have to select a finite $N$ for training consistency models, potentially introducing bias into the learning process. To understand the influence of $N$ on sample quality, we train a consistency model with improved techniques from \cref{sec:improvements,sec:noema,sec:pseudo_huber}. Unlike \citet{song2023consistency}, we use an exponentially increasing curriculum for the total discretization steps $N$, doubling $N$ after a set number of training iterations. Specifically, the curriculum is described by
+\begin{align}
+N(k) = \min( s_0 2^{\lfloor \frac{k}{K'} \rfloor}, s_1) + 1, \quad K' = \Big\lfloor \frac{K}{\log_2 \lfloor s_1 / s_0 \rfloor + 1} \Big\rfloor,
+\label{eq:exponential}
+\end{align}
+and its shape is labelled ``Exp'' in \cref{fig:curriculum_shape}.
+
+As revealed in \cref{fig:scaling_law}, the sample quality of consistency models improves predictably as $N$ increases. Importantly, FID scores relative to $N$ adhere to a precise power law until reaching saturation, after which further increases in $N$ yield diminishing benefits. As noted by \citet{song2023consistency}, while larger $N$ can reduce bias in CT, they might increase variance. On the contrary, smaller $N$ reduces variance at the cost of higher bias. Based on \cref{fig:scaling_law}, we cap $N$ at 1281 in $N(k)$, which we empirically find to strike a good balance between bias and variance. In our experiments, we set $s_0$ and $s_1$ in discretization curriculums from their default values of 2 and 150 in \citet{song2023consistency} to 10 and 1280 respectively.
+
+
+
+Aside from the exponential curriculum above, we also explore various shapes for $N(k)$ with the same $s_0=10$ and $s_1=1280$, including a constant function, the square root function from \citet{song2023consistency}, a linear function, a square function, and a cosine function. The shapes of various curriculums are illustrated in \cref{fig:curriculum_shape}. As \cref{fig:curriculums} demonstrates, the exponential curriculum yields the best sample quality for consistency models. Consequently, we adopt the exponential curriculum in \cref{eq:exponential} as our standard for setting $N(k)$ going forward.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.345\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/scaling_law.png}
+        \caption{FID scores vs. $N$}\label{fig:scaling_law}
+    \end{subfigure}%
+    \begin{subfigure}[b]{0.337\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/discretization_curriculums.png}
+        \caption{Various curriculums for $N(k)$.}\label{fig:curriculum_shape}
+    \end{subfigure}%
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/discretization.png}
+        \caption{FIDs vs. $N(k)$ curriculums.}\label{fig:curriculums}
+    \end{subfigure}
+    \caption{(a) FID scores improve predictably as the number of discretization steps $N$ grows. (b) The shapes of various curriculums for total discretization steps $N(k)$. (c) The FID curves of various curriculums for discretization. All models are trained with improved techniques from \cref{sec:improvements,sec:noema,sec:pseudo_huber} with the only difference in discretization curriculums.}\label{fig:discretization}
+\end{figure}
+
+\subsection{Improved noise schedules}\label{sec:noise}
+
+
+\citet{song2023consistency} propose to sample a random $i$ from $\mcal{U}\llbracket 1, N-1 \rrbracket$ and select $\sigma_i$ and $\sigma_{i+1}$ to compute the CT objective. Given that $\sigma_i = (\sigma_\text{min}^{1/\rho} + \frac{i-1}{N-1}(\sigma_\text{max}^{1/\rho} - \sigma_\text{min}^{1/\rho}))^\rho$, this corresponds to sampling from the distribution $p(\log \sigma) = \sigma \frac{\sigma^{1/\rho - 1}}{\rho (\sigma_\text{max}^{1/\rho} - \sigma_\text{min}^{1/\rho})}$ as $N \to \infty$. As shown in \cref{fig:pdf_logsigma}, this distribution exhibits a higher probability density for larger values of $\log \sigma$. This is at odds with the intuition that consistency losses at lower noise levels influence subsequent ones and cause error accumulation, so losses at lower noise levels should be given greater emphasis. Inspired by \citet{Karras2022edm}, we address this by adopting a lognormal distribution to sample noise levels, setting a mean of -1.1 and a standard deviation of 2.0. As illustrated in \cref{fig:pdf_logsigma}, this lognormal distribution assigns significantly less weight to high noise levels. Moreover, it also moderates the emphasis on smaller noise levels. This is helpful because learning is easier at smaller noise levels due to the inductive bias in our parameterization of the consistency model to meet the boundary condition.
+
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.345\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/pdf_logsigma.png}
+        \caption{PDF of $\log \sigma$}\label{fig:pdf_logsigma}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/lognormal.png}
+        \caption{Lognormal vs. default schedules.}\label{fig:lognormal}
+    \end{subfigure}
+    \caption{The PDF of $\log \sigma$ indicates that the default noise schedule in \citet{song2023consistency} assigns more weight to larger values of $\log \sigma$, corrected by our lognormal schedule. We compare the FID scores of CT using both the lognormal noise schedule and the original one, where both models incorporate the improved techniques in \cref{sec:improvements,sec:noema,sec:pseudo_huber,sec:discretization}.}\label{fig:lognormal_schedule}
+\end{figure}
+
+For practical implementation, we sample noise levels in the set $\{\sigma_1, \sigma_2, \cdots, \sigma_N\}$ according to a discretized lognormal distribution defined as
+\begin{align}
+p(\sigma_i) \propto \operatorname{erf}\bigg(\frac{\log(\sigma_{i+1}) - P_\text{mean}}{\sqrt{2}P_\text{std}}\bigg) - \operatorname{erf}\bigg(\frac{\log(\sigma_{i}) - P_\text{mean}}{\sqrt{2}P_\text{std}}\bigg),
+\end{align}
+where $P_\text{mean} = -1.1$ and $P_\text{std} = 2.0$. As depicted in \cref{fig:lognormal}, this lognormal noise schedule significantly improves the sample quality of consistency models.
+

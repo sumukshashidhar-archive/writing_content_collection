@@ -1,0 +1,45 @@
+
+\section{Systems}
+\label{sec:systems}
+
+
+
+Scaling autoencoders to the largest scales in this paper would not be feasible without our systems improvements.  Model parallelism is necessary once parameters cannot fit on one GPU.  A naive implementation can be an order of magnitude slower than our optimized implementation at the very largest scales.
+
+\subsection{Parallelism}
+
+We use standard data parallel and tensor sharding \citep{shoeybi2019megatron}, with an additional allgather for the TopK forward pass to determine which $k$ latents should are in the global top k. To minimize the cost of this allgather, we truncate to a capacity factor of 2 per shard---further improvements are possible but would require modifications to NCCL. For the largest (16 million) latent autoencoder, we use 512-way sharding. Large batch sizes (\autoref{sec:batch_size_invariance}) are very important for reducing the parallelization overhead.
+
+The very small number of layers creates a challenge for parallelism - it makes pipeline parallelism \citep{huang2019gpipe}
+and FSDP \citep{zhao2023pytorch} inapplicable. Additionally, opportunities for communications overlap are limited because of the small number of layers, though we do overlap host to device transfers and encoder data parallel comms for a small improvement.
+
+\subsection{Kernels}
+\label{sec:kernels}
+
+We can take advantage of the extreme sparsity of latents to perform most operations using substantially less compute and memory than naively doing dense matrix multiplication.  This was important when scaling to large numbers of latents, both via directly increasing throughput and reducing memory usage.
+
+We use two main kernels:
+\begin{itemize}
+\item \texttt{DenseSparseMatmul}: a multiplication between a dense and sparse matrix
+\item \texttt{MatmulAtSparseIndices}: a multiplication of two dense matrices evaluated at a set of sparse indices
+\end{itemize}
+
+Then, we have the following optimizations:
+\begin{enumerate}
+\item The decoder forward pass uses \texttt{DenseSparseMatmul}
+\item The decoder gradient uses \texttt{DenseSparseMatmul}
+\item The latent gradient uses \texttt{MatmulAtSparseIndices}
+\item The encoder gradient uses \texttt{DenseSparseMatmul}
+\item The pre-bias gradient uses a trick of summing pre-activation gradient across the batch dimension before multiplying with the encoder weights.
+\end{enumerate}
+
+Theoretically, this gives a compute efficiency improvement of up to 6x in the limit of sparsity, since the encoder forward pass is the only remaining dense operation. %
+In practice, we indeed find the encoder forward pass is much of the compute, and the pre-activations are much of the memory.  %
+
+
+To ensure that reads are coalesced, the decoder weight matrix must also be stored transposed from the typical layout.  We also use many other kernels for fusing various operations for reducing memory and memory bandwidth usage.
+
+
+
+
+

@@ -1,0 +1,89 @@
+
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Setup}
+
+
+\textbf{Inputs:} We train autoencoders on the residual streams of both GPT-2 small \citep{radford2019language} and models from 
+a series of increasing sized models sharing GPT-4 architecture and training setup,
+including GPT-4 itself \citep{openai2023gpt}\footnote{All presented results either have qualitatively similar results on both GPT-2 small and GPT-4 models, or were only ran on one model class.}.  
+We choose a layer near the end of the network, which should contain many features without being specialized for next-token predictions (see \autoref{sec:layer_location_impact} for more discussion).  Specifically, we use a layer $\frac{5}{6}$ of the way into the network for GPT-4 series models, and we use layer 8 ($\frac{3}{4}$ of the way) for GPT-2 small.
+We use a context length of 64 tokens for all experiments.
+We subtract the mean over the $d_{\text{model}}$ dimension and normalize to all inputs to unit norm, prior to passing to the autoencoder (or computing reconstruction errors).
+
+\textbf{Evaluation:} After training, we evaluate autoencoders on sparsity \Lzero, and reconstruction mean-squared error (MSE).  We report a normalized version of all MSE numbers, where we divide by a baseline reconstruction error of always predicting the mean activations.  
+
+\textbf{Hyperparameters:} To simplify analysis, we do not consider learning rate warmup or decay unless otherwise noted.  We sweep learning rates at small scales and extrapolate the trend of optimal learning rates for large scale. See \autoref{sec:optimization} for other optimization details.
+
+\subsection{Baseline: ReLU autoencoders}
+
+
+    
+For an input vector $x \in \mathbb{R}^{d}$ from the residual stream, and $n$ latent dimensions, we use baseline ReLU autoencoders from \citep{bricken2023monosemanticity}. The encoder and decoder are defined by:
+\begin{equation}
+\begin{aligned}
+    z &= \text{ReLU}(W_\text{enc} (x - b_\text{pre}) + b_\text{enc}) \\
+    \hat{x} &= W_\text{dec} z + b_\text{pre}
+\end{aligned}
+\end{equation}
+with $W_\text{enc} \in \mathbb{R}^{n \times d}$, $b_\text{enc} \in \mathbb{R}^{n}$, $W_\text{dec} \in \mathbb{R}^{d \times n}$, and $b_\text{pre} \in \mathbb{R}^{d}$. The training loss is defined by $\mathcal{L} = ||x - \hat{x}||^2_2 + \lambda ||z||_1$, where $||x - \hat{x}||^2_2$ is the reconstruction MSE, $||z||_1$ is an \Lone penalty promoting sparsity in latent activations $z$, and $\lambda$ is a hyperparameter that needs to be tuned.
+
+
+\subsection{TopK activation function}
+
+We use a $k$-sparse autoencoder \citep{makhzani2013k}, which directly controls the number of active latents by using an activation function (TopK) that only keeps the $k$ largest latents, zeroing the rest. The encoder is thus defined as:
+\begin{equation}
+\begin{aligned}
+    z &= \text{TopK}(W_\text{enc} (x - b_\text{pre}))
+\end{aligned}
+\end{equation}
+and the decoder is unchanged. The training loss is simply $\mathcal{L} = ||x - \hat{x}||^2_2$.
+
+Using $k$-sparse autoencoders has a number of benefits:
+\begin{itemize}
+\item It removes the need for the \Lone penalty. \Lone is an imperfect approximation of \Lzero, and it introduces a bias of shrinking all positive activations toward zero
+(\autoref{sec:shrinkage}).
+\item It enables setting the \Lzero directly, as opposed to tuning an \Lone coefficient $\lambda$, enabling simpler model comparison and rapid iteration.  It can also be used in combination with arbitrary activation functions.\footnote{In our code, we also apply a ReLU to guarantee activations to be non-negative.  However, the training curves are indistinguishable, as the $k$ largest activations are almost always positive for reasonable choices of $k$.} %
+\item It empirically outperforms baseline ReLU autoencoders on the sparsity-reconstruction frontier (\autoref{fig:relu_vs_topk}a), and this gap increases with scale (\autoref{fig:relu_vs_topk}b). %
+\item It increases monosemanticity of random activating examples by  effectively clamping small activations to zero
+(\autoref{sec:explanations}).
+\end{itemize}
+ 
+
+\begin{figure}[tbp]
+\centering
+\begin{subfigure}{.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/plot_gpt4_mse_L0_32768.pdf}
+    \caption{At a fixed number of latents ($n=32768$), TopK has a better reconstruction-sparsity trade off than ReLU and ProLU, and is comparable to Gated.}
+    \label{fig:relu_vs_topk_a}
+\end{subfigure}%
+\hspace{10pt}
+\begin{subfigure}{.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/plot_gpt4_mse_ndirs_128.pdf}
+    \caption{At a fixed sparsity level ($L_0=128$), scaling laws are steeper for TopK than ReLU.\protect\footnotemark\\}
+    \label{fig:relu_vs_topk_b}
+\end{subfigure}
+\caption{Comparison between TopK and other activation functions.}
+\label{fig:relu_vs_topk}
+\end{figure}
+
+
+\footnotetext{Non-TopK cannot set a precise \Lzero, so we interpolated using a piecewise linear function in log-log space.}
+
+
+
+
+
+
+
+
+
+\vspace{-10pt}
+\subsection{Preventing dead latents}
+
+Dead latents pose another significant difficulty in autoencoder training. In larger autoencoders, an increasingly large proportion of latents stop activating entirely at some point in training.  For example, \citet{templeton2024scaling} train a 34 million latent autoencoder with only 12 million alive latents, and in our ablations we find up to 90\% dead latents\footnote{We follow \citet{templeton2024scaling}, and consider a latent dead if it has not activated in 10 million tokens} when no mitigations are applied (\autoref{fig:ablation-dead-latents}).  This results in substantially worse MSE and makes training computationally wasteful.
+We find two important ingredients for preventing dead latents: we initialize the encoder to the transpose of the decoder, and we use an auxiliary loss that models reconstruction error using the top-$k_{\text{aux}}$ dead latents (see \autoref{sec:aux-loss} for more details).  Using these techniques, even in our largest (16 million latent) autoencoder only 7\% of latents are dead. 
+

@@ -1,0 +1,110 @@
+
+\section{Qualitative results}
+
+\subsection{Subjective latent quality}
+\label{sec:samples}
+
+Throughout the project, we stumbled upon many subjectively interesting latents.  The majority of latents in our GPT-2 small autoencoders seemed interpretable, even on random positive activations. Furthermore, the ablations typically had predictable effects based on the activation conditions.  For example, some features that are potentially part of interesting circuits in GPT-2:
+
+\begin{itemize}
+\item An unexpected token breaking a repetition pattern (A B C D ... A B X!).  This upvotes future pattern breaks (A B Y!), but also upvotes continuation of the pattern right after the break token (A B X $\rightarrow$ D).
+\item Text within quotes, especially activating when within two nested sets of quotes.  Upvotes tokens that close the quotes like " or ', as well as tokens which close multiple sets of quotes at once, such as "' and '".  
+\item Copying/induction of capitalized phrases (A B ... A $\rightarrow$ B)
+\end{itemize}
+
+In GPT-4, we tended to find more complex features, including ones that activate on the same concept in multiple languages, or on complex technical concepts such as algebraic rings.
+
+You can explore for yourself at \href{https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html}{our viewer}.
+
+\subsection{Finding features}
+\label{sec:finding_features}
+
+Typical features are not of particular interest, but having an autoencoder also lets one easily find relevant features.  Specifically, one can use gradient-based attribution to quickly compute how relevant latents are to behaviors of interest \citep{baehrens2010explain,simonyan2013deep}.
+
+Following the methodologies of \cite{templeton2024scaling} and \cite{mossing2024tdb}, we found features by using a hand-written prompt, with a set of "positive" and "negative" token predictions, and back-propagating from logit differences to latent values.  We then consider latents sorted by activation times gradient value, and inspect the latents.
+
+We tried this methodology with a $n=2^{17}=131072$, $k=32$ GPT-2 autoencoder and were able to quickly find a number of safety relevant latents, such as ones corresponding to profanity or child sexual content.  Clamping these latents appeared to have causal effect on the samples.  For example, clamping the profanity latent to negative values results in significantly less profanity (some profanity can still be observed in situations where it copies from the prompt).
+
+\subsection{Latent activation distributions}
+
+We anecdotally found that latent activation distributions often have multiple modes, especially in early layers.
+
+\subsection{Latent density and importance curves}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\textwidth]{figures/fig_gpt2sm_L8sweepn_2m_hist_feature_density.png}
+    \includegraphics[width=0.49\textwidth]{figures/fig_gpt2sm_L8sweepn_2m_hist_mean_acts_squared.png}
+    \caption{Distributions of latent densities, and average squared activation.  Note that we do not observe multiple density modes, as observed in \citep{bricken2023monosemanticity}.  Counts are sampled over 1.5e7 total tokens.  Note that because latents that activate every 1e7 tokens are considered dead during training (and thus receive AuxK gradient updates), 1e-7 is in some sense the minimum density, though the AuxK loss term coefficient may allow it to be lower.}
+    \label{fig:feature_density}
+\end{figure}
+
+We find that log of latent density is approximately Gaussian (\autoref{fig:feature_density}).  If we define the importance of a feature to be the expected squared activation (an approximation of its marginal impact on MSE), then log importance looks a bit more like a Laplace distribution.  Modal density and modal feature importance both decrease with number of total latents (for a fixed $k$), as expected.
+
+\subsection{Solutions with dense latents}
+\label{sec:dense_solutions}
+
+One option for a sparse autoencoder is to simply learn the $k$ directions that explain the most variance.  As $k$ approaches $d_{model}$, this ``principal component''-like solution may become competitive with solutions where each latent is used sparsely.  In order to check for such solutions, we can simply measure the average density of the $d_{model}$ densest latents.  Using this metric, we find that for some hyperparameter settings, GPT-2 small autoencoders find solutions with many dense latents (\autoref{fig:dense_solutions}), beginning around $k=256$ but especially for $k=512$.  
+
+This coincides with when the scaling laws from \autoref{sec:scaling} begin to break - many of our trends between $k$ and reconstruction loss bend significantly.  Also, MSE becomes significantly less sensitive to $n$, at $k=512$.
+
+
+
+
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/fig_gpt2sm_L8sweepnk_memorization.png}
+    \caption{Average density of the $d_{model}$ most-dense features, divided by \Lzero, for different autoencoders.  When $k=512$, the learned autoencoders have many dense features.  This corresponds to when ablations stop having sparse effects \autoref{sec:effects-sparsity}, and anecdotally corresponds to noticeably less interpretable features.  For $k=256$, $n=2048$, there is perhaps an intermediate regime.}
+    \label{fig:dense_solutions}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/fig_gpt2sm_L8sweepnk_explanation_score.png}
+    \caption{Explanation scores for GPT-2 small autoencoders of different $n$ and $k$, evaluated on 400 randomly chosen latents per autoencoder.  It is hard to read off trends, but the explanation score is able to somewhat detect the dense solutions region.}
+    \label{fig:grid_explanation_scores}
+\end{figure}
+
+
+\ifpreprint
+
+\subsection{Recurring dense features in GPT-2 small}
+
+We manually examined the densest latents across various GPT-2 small layer 8 autoencoders, trained in different ways (e.g. differing numbers of total latents).
+
+The two densest latents are always the same feature:  the latent simply activates more and more later in the context ($\sim$ 40\% active), and one that activates more and more earlier in the context excluding the first position ($\sim$35\% active).  Both features look like they want to activate more than they do, with TopK probably preventing it from activating with lower values.
+
+The third densest latent is always a first-token-position feature ($\sim$30\% active), which has a modal activation value in a narrow range between 14.6-14.8.  Most of its activation values are significantly smaller values, at tokens after the first position; the large value is always at the first token.  These smaller values appear uninterpretable; we conjecture these are simply interference with the first position direction.  (Sometimes there are two of these latents, the second with smaller activation values.)
+
+Finally, there is a recurring ``repetition'' feature that is $\sim$20\% dense.  Its top activations are mostly highly repetitive sequences, such as series of dates, chapter indices, numbers, punctuations, repeated exact phrases, or other repetitive things such as Chess PGN notation.  However, like the first-token-position latents, random activations of this latent are typically appear unrelated and uninterpretable.
+
+Often in the top ten densest latents, we find opposing latents, which have decoder cosine similarity close to $-1$.  In particular, the first-token-position feature and the repetition latent both seems to always have an opposite latent.  The less dense of the two opposite latents always seems to appear uninterpretable.  We conjecture that these are symptoms of optimization failure - the opposite latents cancel out spurious activations in the denser latent.
+
+
+\subsection{Clustering latents}
+
+\citep{elhage2022toy} discuss how underlying features may lie in distinct sub-spaces. 
+If such sub-spaces exists, we hypothesize that the set of latent encoding vectors $W \in \mathbb{R}^{n \times d}$ can be written as a block-diagonal matrix $W' = P W R$, where $P \in \mathbb{R}^{n \times n}$ is a permutation matrix, and $R \in \mathbb{R}^{d \times d}$ is  orthogonal. 
+We can then use the singular vector decomposition (SVD) to write $W = U \Sigma V^\top$ and $W' = U' \Sigma' V'^\top$, noting that $U'$ is also block diagonal. Finally, we write $W = P^\top U' \Sigma' V'^\top R^\top = U \Sigma V^\top$, and because the SVD is unique up to a column permutation $P'$, we get $U = P^\top U' P'$. In other words, if $W$ is block-diagonal in some unknown basis, $U$ is also block diagonal up to a permutation of rows and columns.
+
+To find a good permutation of rows, we sorted the rows of $U$ based on how similarly they project on all elements of the singular vector basis. Specifically, we normalized each row to unit norm $\tilde{U_i} = U_i / ||U_i||$ and considered the pairwise euclidean distances $d_{i,j} = ||\tilde{U_i}^2 - \tilde{U_j}^2||$. These pairwise distances were then reduced to a single dimension with a UMAP algorithm \citep{mcinnes2018umap}. The obtained 1-dimensional embedding was then used to order the projections $\tilde{U_i}^2$ (\autoref{fig:cluster_subspaces}a), which reveals two fuzzily separated sub-spaces. These two sub-spaces use respectively about 25\% and 75\% of the dimensions of the entire vector space.
+
+Interestingly, ordering the columns by singular values is fairly consistent with these two sub-spaces. One reason for this result might by that latents projecting to the first sub-space have different encoder norms than latents projecting to the second sub-space (\autoref{fig:cluster_subspaces}b). This difference in norm can significantly guide the SVD to separate these two sub-spaces.
+
+To further interpret these two sub-spaces, we manually looked at latents from each cluster. We found that latents from the smaller cluster tend to activate on relatively non-diverse vocabulary tokens. To quantify this insight, we first estimated $A_{i,v}$, the average squared activation of latent $i$ on vocabulary token $v$. Then, we normalized the vectors $A_{i}$ to sum to one, $\tilde{A}_{i,v} = A_{i,v} / \sum_w A_{i,w}$ and computed the effective number of token $m_i = \exp(\sum_v \tilde{A}_{i,v} \log(\tilde{A}_{i,v}))$. The effective number of token is a continuous metric with values in $[1, n_\text{vocab}]$, and it is equal to $k$ when a latent activates equally on $k$ vocabulary tokens. With this metric, we confirmed quantitatively (\autoref{fig:cluster_subspaces}c) that latents from the smaller cluster all activate on relatively low numbers of vocabulary tokens (less than $100$), whereas latents from the larger cluster sometimes activate on a larger numbers of vocabulary tokens (up to $1000$).
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.33\textwidth]{figures/plot_latent_clustering_on_singular_vectors.pdf}
+    \includegraphics[width=0.31\textwidth]{figures/plot_latent_clustering_encoder_norm_hist2d.pdf}
+    \includegraphics[width=0.31\textwidth]{figures/plot_latent_clustering_effective_num_tokens_hist2d.pdf}
+
+    
+    \caption{The residual stream seems composed of two separate sub-spaces. About 25\% of latents mostly project on a sub-space using 25\% of dimensions. These latents tend to have larger encoder norm, and to activate on a smaller number of vocabulary tokens. The remaining 75\% of latents mostly project on the remaining 75\% of dimensions, and can activate on a larger number of vocabulary tokens.}
+    \label{fig:cluster_subspaces}
+\end{figure}
+
+
+\fi

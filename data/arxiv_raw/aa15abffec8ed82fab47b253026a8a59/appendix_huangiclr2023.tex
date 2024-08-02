@@ -1,0 +1,26 @@
+While ~\cite{huang2022compressing} train on 11 pressure levels (10, 50, 100, 200, 300, 400, 500, 700, 850, 925, 1000 hPa), we train on 13 pressure levels (50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000 hPa).
+To assess the impact of the change in number and level of the pressure levels on reconstruction accuracy, we compare models trained on the 11 pressure  levels used by \cite{huang2022compressing} with models trained on our chosen 13 pressure levels for one of the four datasets, namely "Dataset 2", which contains daily data at the spatial resolution of 0.25 degrees for the year 2016.
+We chose to compare on this dataset specifically as it has the highest spatial resolution.
+We adapted the models proposed by 
+~\cite{huang2022compressing} to accommodate our 13 pressure levels, varying the width parameter, which corresponds to different compression ratios.
+As the number of model parameters does not depend on the number of levels, encoding a larger number of levels for a given architecture results in a higher compression ratio. 
+Figure \ref{fig:huangiclr2023_global_11_13_levels_comparison} demonstrates that their model can effectively handle the additional pressure levels while maintaining comparable reconstruction performance across different width values. A slight degradation in performance is observed for the width=128 model when trained on 13 levels. It is important to note that the results displayed are from our own implementation of their model, not the original results presented in their paper, although they exhibit close agreement.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/baseline/huangiclr2023_global_11_13_levels_comparison.pdf}
+\caption{Comparison of reconstruction performance for models trained on 11 and 13 pressure levels, with varying network widths on data from year 2016 with 24 hour temporal resolution and 0.25 degrees spatial resolution.}
+\label{fig:huangiclr2023_global_11_13_levels_comparison}
+\end{figure}
+
+We further investigated the reconstruction accuracy of their models at each pressure level when trained on their 11 levels and our selected 13 levels. As shown in Figure \ref{fig:huangiclr2023_per_level_11_13_levels_comparison}, similar performance was achieved for a given pressure level across different width values, with a small degradation when training on 13 levels for a width of 128. Here, width corresponds to the number of neurons in the fully connected layers of the network.
+
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/baseline/huangiclr2023_per_level_11_13_levels_comparison.pdf}
+\caption{Comparison of per-pressure level reconstruction accuracy for models trained on 11 and 13 pressure levels, with varying network widths.}
+\label{fig:huangiclr2023_per_level_11_13_levels_comparison}
+\end{figure}
+
+Given these observations, for comparison with ~\cite{huang2022compressing} we compare reconstructions for geopotential and temperature for 13 vertical levels  (50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000 hPa) for data from the year 2016 sampled every 24 hours reprojected on (721, 1440) latitude/longitude grids. The corresponding data shape is therefore (366, 13, 721, 1440) for each variable.

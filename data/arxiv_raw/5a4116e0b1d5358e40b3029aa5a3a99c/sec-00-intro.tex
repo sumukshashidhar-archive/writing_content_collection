@@ -1,0 +1,45 @@
+\section{Introduction}
+Sparse autoencoders (SAEs) have shown great promise for finding features \citep{cunningham2023sparse,bricken2023monosemanticity,templeton2024scaling,goh2016decoding} and circuits \citep{marks2024sparse} in language models. Unfortunately, they are difficult to train due to their extreme sparsity, so prior work has primarily focused on training relatively small sparse autoencoders on small language models.
+
+
+
+We develop a state-of-the-art methodology to reliably train extremely wide and sparse autoencoders with very few dead latents on the activations of any language model. We systematically study the scaling laws with respect to sparsity, autoencoder size, and language model size.  To demonstrate that our methodology can scale reliably, we train a 16 million latent autoencoder on GPT-4 \citep{openai2023gpt} residual stream activations.  %
+
+Because improving reconstruction and sparsity is not the ultimate objective of sparse autoencoders, %
+we also explore better methods for quantifying autoencoder quality. We study quantities corresponding to: whether certain hypothesized features were recovered, whether downstream effects are sparse, and whether features can be explained with both high precision and recall.  
+
+
+
+
+
+
+Our contributions:
+\vspace{-5pt}
+\begin{enumerate}
+    \item In \autoref{sec:methods}, we describe a state-of-the-art recipe for training sparse autoencoders. %
+    \item In \autoref{sec:scaling}, we demonstrate clean scaling laws and scale to large numbers of latents.
+    \item In \autoref{sec:metrics}, we introduce metrics of latent quality and find larger sparse autoencoders are generally better according to these metrics.%
+
+\end{enumerate}
+We also release \href{https://github.com/openai/sparse_autoencoder}{code}, a full suite of GPT-2 small autoencoders,
+and \href{https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html}{a feature visualizer} for GPT-2 small autoencoders and the 16 million latent GPT-4 autoencoder. %
+\vspace{-5pt}
+
+
+
+
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.48\textwidth]{figures/fig_gpt4_lofc_small.pdf}
+        \includegraphics[width=0.48\textwidth]{figures/fig_gpt4_ksweep_2.pdf}
+    \caption{
+        Scaling laws for TopK autoencoders trained on GPT-4 activations.
+        (Left) Optimal loss for a fixed compute budget.
+        (Right) Joint scaling law of loss at convergence with fixed number of total latents $n$ and fixed sparsity (number of active latents) $k$.  Details in \autoref{sec:scaling}.
+        }
+    \label{fig:scaling_n}
+\end{figure}
+
+

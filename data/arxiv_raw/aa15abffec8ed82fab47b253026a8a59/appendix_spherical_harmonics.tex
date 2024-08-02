@@ -1,0 +1,85 @@
+Spherical harmonics are set of orthogonal functions; they form an orthonormal basis that allows to represent a 2D field defined on a sphere. Spherical harmonics functions are defined from degree 0 up to a maximum degree $l_{max}$, with orders $m$ such that $-l \leq m \leq l$ and $0 \leq l \leq l_{max}$.
+
+At a given longitude (also called \emph{azimuthal} angle) $\phi$ and colatitude (also called \emph{polar} angle) $\theta$ (both expressed in radians), spherical harmonics function $Y_m^l(\theta, \phi)$ with degree $l$ and order $m$, and which is defined over complex range (with $i^2=-1$), is calculated as follows:
+
+\begin{equation}
+Y_m^l(\theta, \phi) \equiv \sqrt{\frac{2l+1}{4\pi} \frac{(l-m)!}{(l+m)!}}
+ P_m^l(\cos(\theta))e^{im\phi}
+\label{eq:sph_harm_fun}
+\end{equation}
+
+In Equation \ref{eq:sph_harm_fun}, $P_m^l(\cos(\theta))$ is the associated Legendre polynomial of order $m$, degree $l$ and defined over colatitudes $\theta$. We can separate the polar angles $\theta$ from the azimuthal angles $\phi$ by expressing Eq. \ref{eq:sph_harm_fun} as $Y_m^l(\theta, \phi) \equiv \lambda_m^l(\cos(\theta))e^{im\phi}$, where:
+
+\begin{equation}
+\lambda_m^l(\cos(\theta)) \equiv \sqrt{\frac{2l+1}{4\pi} \frac{(l-m)!}{(l+m)!}} P_m^l(\cos(\theta))
+\label{eq:sph_harm_lambda}
+\end{equation}
+
+\subsection{Normalized associated Legendre polynomials}
+
+Following \citet{willmert2020notes,willmert2019constraining}, we calculate the normalized associated Legendre polynomials using the following recurrence relations on $\lambda_m^l(\cos(\theta))$ in order to ensure numerical stability:
+
+\begin{align}
+\lambda_0^0(x) &=  \sqrt{\frac{1}{4\pi}} \\
+\lambda_{l+1}^{l+1}(x) &= -\mu_{l+1} \sqrt{1-x^2}\lambda_l^l(x) \\
+\lambda_l^{l+1}(x) &= \nu_{l+1} x \lambda_l^l(x) \\
+\lambda_m^l(x) &= \alpha_m^l x \lambda_m^{l-1}(x) - \beta_m^l\lambda_m^{l-2}(x)
+\end{align}
+
+Where terms $\mu_l$, $\nu_l$, $\alpha_m^l$ and $\beta_m^l$ are defined as:
+
+\begin{align}
+\mu_l &= \sqrt{1 + \frac{1}{2l}} \\
+\nu_l &= \sqrt{1+2l} \\
+\alpha_m^l &= \sqrt{\frac{2l+1}{2l-3}\frac{4(l-1)^2-1}{l^2 - m^2}} \\
+\beta_m^l &= \sqrt{\frac{2l+1}{2l-3}\frac{(l-1)^2-m^2}{l^2 - m^2}}
+\end{align}
+
+Note that for a given maximum order $l_{max}$ and a fixed set of polar angles $\theta$ (i.e., the set of colatitudes in the latitude/longitude data, or the unique set of colatitudes corresponding to the diagonals of HEALPix mesh coordinates), these polynomials need to be computed and stored only once. When developing the code for the Lagrange polynomial-based spherical harmonics transform, we matched our results to the standard SciPy implementation provided by {\tt scipy.special.sph\_harm}\footnote{\url{https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.sph\_harm.html}}.
+
+\subsection{Spherical harmonic transform (analysis)}
+
+Spherical harmonic coefficients $a_{lm}$ are defined as
+$a_{lm} = \int_{S} f(\theta, \phi) {Y_m^l}^*(\theta, \phi) d\Omega$ for a continuous field $f$. When using a set of $N$ pairs of longitude angles and colatitude angles $\{(\phi_i, \theta_i)\}_i$ covering a grid, their approximation becomes:
+
+\begin{equation}
+\hat{a}_{lm} = \sum_{i=1}^N f(\theta_i, \phi_i) \bar{Y}_{lm}(\theta_i, \phi_i) \sin(\theta_i)\Delta\theta_i\Delta\phi_i
+\label{eq:sph_harm_forward}
+\end{equation}
+
+N.B. that if the signal $f$ is real, then: $a_{l(-m)} = (-1)^m \bar{a}_{lm}$, which entails that we only need to store the lower triangular $\mathbb{C} ^{(l+1) \times (l+1)}$ matrix of spherical harmonics coefficients.
+
+Equation \ref{eq:sph_harm_forward} can be decomposed as a sum of sums, the first summation being over unique colatitudes $\{\theta_j\}_j$ and for each colatitude $\theta_j$, the nested summations over longitudes of the grid points at that constant colatitude (i.e., on a colatitude ring~\citep{willmert2022ring}). In the case of latitude/longitude grids, we sample $f(\theta, \phi)$ at $N_{lat}=721$ colatitudes with degree values (0, 0.25, ..., 179.75, 180) and at $N_{lon}=1440$ longitudes with degree values (0, 0.25, ..., 359.5, 359.75). In the case of HEALPix, we sample $f(\theta, \phi)$ at 1024 colatitude rings associated to the 512 off-diagonals of the northern polar HEALPix tiles and to the 512 off-diagonals of the southern polar HEALPix tiles (see \citet{willmert2022ring}).
+
+If the $N_{lon}$ samples of $f(\theta,\phi)$ are regularly spaced on each colatitude ring, then the $N_{lat} \times N_{lon} \times {l_{max}+1} \times {l_{max}+1}$ multiplications in Equation \ref{eq:sph_harm_forward} can be replaced by $N_{lat} \times {l_{max}+1} \times {l_{max}+1}$ multiplications by using the Fast Fourier Transform of each ring.
+
+\subsection{Reverse spherical harmonic transform (synthesis)}
+
+The reverse spherical harmonic transform is:
+
+\begin{equation}
+\hat f(\theta, \phi) = \sum_{l=0}^{l_{max}}\sum_{m=-l}^l a_{lm}Y_m^l(\theta, \phi)
+\label{eq:sph_harm_backward}
+\end{equation}
+
+From Equation \ref{eq:sph_harm_fun}, we can deduct that $Y_{-m}^l(\theta, \phi) = (-1)^m \bar{Y}_m^l(\theta, \phi)$, hence the real-valued synthesis $\hat f(\theta, \phi)$ can be written as:
+
+\begin{equation}
+\hat f(\theta, \phi) = {\tt Re} \left [ \sum_{l=0}^{l_{max}}\sum_{m=0}^l (2 - \delta_{m0}) a_{lm}Y_m^l(\theta, \phi) \right ]
+\label{eq:sph_harm_backward_real}
+\end{equation}
+
+
+We benchmarked our forward and backward implementations by performing a round-trip analysis and synthesis of latitude/longitude data (and of HEALPix projections of latitude/longitude data) against the latitude/longitude spherical harmonics transform implementation in Python/JAX\footnote{\url{https://github.com/google-research/dinosaur}} that accompanies \citep{hoyer2023neural}.
+
+\subsection{Power spectral density of spherical data using spherical harmonics}
+
+Once we have spherical harmonics coefficients $\{a_{lm}\}_{l,m}$, we compute the power spectral density as:
+
+\begin{equation}
+I_l = \sum _{m=0}^{l-1} \frac{1}{2l + 1} | a_{lm} |^2
+\end{equation}
+
+\subsection{Reprojection of HEALPix data into latitude/longitude coordinates}
+
+Spherical harmonics provide a simple mechanism for reprojecting HEALPix data into equirectangular latitude/longitude coordinates: namely, after analysing a HEALPix representation $f_{HEALPix}(\theta, \phi)$ into a set of spherical harmonics coefficients $\{a_{lm}\}_{l,m}$, we synthesize points $f(\theta,\phi)$ on a latitude/longitude grid simply by looping over $N_{lat}$ coordinates and calculating inverse FFT on $N_{lon}$-point equilateral and regularly spaced rings.

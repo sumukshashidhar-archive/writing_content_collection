@@ -1,0 +1,25 @@
+\begin{tabular}{ll|p{6.8cm}ll}
+\toprule
+\multicolumn{2}{c|}{Taxonomy} & Perspective & Ours \\
+\midrule
+Ours & Sexual & $\max$(sexually\_explicit, profanity, flirtation) & sexual \\
+    & Hate & identity\_attack & hate \\
+    & Violence & threat & violence \\
+    & Harassment & max(toxicity, severe\_toxicity, insult, threat) & harassment \\
+    & Sexual/minors & - & sexual/minors \\
+\midrule
+Jigsaw & Toxic & toxicity & harassment \\
+    % & \quad /severe & severe\_toxicity & harassment \\
+    & Obscene & $\max$(sexually\_explicit, profanity) & sexual \\
+    & Threat & threat & violence \\
+    & Insult & insult & $\max$(harassment, hate) \\
+    & Identity hate & identity\_attack & hate \\
+\midrule
+TweetEval & Hate & identity\_attack & hate \\
+    & Offensive & $\max$(toxicity, severe\_toxicity, threat, insult, identity\_attack) & harassment \\
+\midrule
+Stormfront & Hate & identity\_attack & hate \\
+\midrule
+Reddit & Sexual & $\max$(sexually\_explicit, profanity, flirtation) & sexual \\
+\bottomrule
+\end{tabular}

@@ -1,0 +1,262 @@
+
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.45\textwidth}
+    \includegraphics[width=\textwidth]{figures/plot_benchmark_gpt2_128k_a2.pdf}%
+    \caption{For a fixed number of latents ($n=2^{17}=131072$), the downstream-loss/sparsity trade-off is better for TopK autoencoders than for other activation functions.}
+    \end{subfigure}
+    \hspace{10pt}
+    \begin{subfigure}[b]{0.45\textwidth}
+    \includegraphics[width=\textwidth]{figures/plot_benchmark_gpt2_128k_a5.pdf}%
+     \caption{For a fixed sparsity level ($L_0 = 128$), a given MSE level leads to a lower downstream-loss for TopK autoencoders than for other activation functions.}
+     \end{subfigure}
+     \caption{Comparison between TopK and other activation functions on downstream loss.  Comparisons done for GPT-2 small, see \autoref{fig:downstream_loss_benchmark_gpt4} for GPT-4.}
+    \label{fig:downstream_loss_benchmark}
+\end{figure}
+
+\section{Evaluation}
+\label{sec:metrics}
+
+
+
+
+We demonstrated in \autoref{sec:scaling} that our larger autoencoders scale well in terms of MSE and sparsity (see also a comparison of activation functions in \autoref{sec:benchmark}). However, the end goal of autoencoders is not to improve the sparsity-reconstruction frontier (which degenerates in the limit\footnote{Improving the reconstruction-sparsity frontier is not always strictly better. An infinitely wide maximally sparse ($k = 1$) autoencoder can perfectly reconstruct by assigning latents densely in $\mathbb R^d$, while being completely structure-less and uninteresting.}), but rather to find features useful for applications, such as mechanistic interpretability.
+Therefore, we measure autoencoder quality with the following metrics:
+
+\begin{enumerate}
+\item \textbf{Downstream loss}: How good is the language model loss if the residual stream latent is replaced with the autoencoder reconstruction of that latent? (\autoref{sec:downstream_loss})
+\item \textbf{Probe loss}: Do autoencoders recover features that we believe they might have? (\autoref{sec:probes})
+\item \textbf{Explainability}: Are there simple explanations that are both necessary and sufficient for the activation of the autoencoder latent? (\autoref{sec:explanations})
+\item \textbf{Ablation sparsity}: Does ablating individual latents have a sparse effect on downstream logits? (\autoref{sec:effects-sparsity})
+\end{enumerate}
+
+
+
+These metrics provide evidence that autoencoders generally get better when the number of total latents increases.
+The impact of the number of active latents \Lzero is more complicated.  Increasing \Lzero makes explanations based on token patterns worse, but makes probe loss and ablation sparsity better.  All of these trends also break when \Lzero gets close to $d_{\text{model}}$, a regime in which latents also become quite dense (see \autoref{sec:dense_solutions} for detailed discussion).
+
+
+
+
+\subsection{Downstream loss}
+\label{sec:downstream_loss}
+
+
+
+
+
+An autoencoder with non-zero reconstruction error may not succeed at modeling the features most relevant for behavior \citep{braun2024identifying}.  
+To measure whether we model features relevant to language modeling, we follow prior work \citep{bills2023language, cunningham2023sparse,bricken2023monosemanticity,braun2024identifying} and consider downstream Kullback-Leibler (KL) divergence and cross-entropy loss.\footnote{Because a perfect reconstruction would lead to a non-zero cross-entropy loss, we actually consider the difference to the perfect-autoencoder cross-entropy (``delta cross-entropy'').} In both cases, we test an autoencoder by replacing the residual stream by the reconstructed value during the forward pass, and seeing how it affects downstream predictions. %
+We find that $k$-sparse autoencoders improve more on downstream loss than on MSE over prior methods (\autoref{fig:downstream_loss_benchmark}a).
+We also find that MSE has a clean power law relationship with both KL divergence, and difference of cross entropy loss (\autoref{fig:downstream_loss_benchmark}b), when keeping sparsity \Lzero fixed and only varying autoencoder size. Note that while this trend is clean for our trained autoencoders, we can observe instances where it breaks such as when modulating $k$ at test time (see  \autoref{sec:testtimek}).  %
+
+
+
+
+One additional issue is that raw loss numbers alone are difficult to interpret---we would like to know how good it is in an absolute sense. Prior work \citep{bricken2023monosemanticity,rajamanoharan2024improving} use the loss of ablating activations to zero as a baseline and report the fraction of loss recovered from that baseline. However, because ablating the residual stream to zero causes very high downstream loss, this means that even very poorly explaining the behavior can result in high scores.\footnote{For completeness, the zero-ablation fidelity metric of our 16M autoencoder is 98.2\%.}
+
+Instead, we believe a more natural metric is to %
+consider the relative amount of pretraining compute needed to train a language model of comparable downstream loss. For example, when our 16 million latent autoencoder is substituted into GPT-4, we get a language modeling loss corresponding to 10\% of the pretraining compute of GPT-4. %
+
+
+
+
+\begin{figure*}[t!]
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[width=1.0\textwidth]{figures/fig_gpt2sm_L8sweepnk_2m_probe_grid.png}
+        \caption{Probe loss}
+        \label{fig:metric_grids_probe}
+    \end{subfigure}%
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[width=1.0\textwidth]{figures/fig_gpt2sm_L8sweepnk_2m_ablatevote_sparsity_l1l2.png}
+        \caption{Logit diff sparsity}
+        \label{fig:metric_grids_sparsity}
+    \end{subfigure}
+    \caption{The probe loss and logit diff metrics as a function of number of total latents $n$ and active latents $k$, for GPT-2 small autoencoders. More total latents (higher $n$) generally improves all metrics (yellow = better).  Both metrics are worse at \Lzero$=512$, a regime in which solutions are dense (see \autoref{sec:dense_solutions}). 
+}
+    \label{fig:metric_grids}
+\end{figure*}
+
+\subsection{Recovering known features with 1d probes}
+\label{sec:probes}
+
+
+If we expect that a specific feature (e.g sentiment, language identification) should be discovered by a high quality autoencoder, then one metric of autoencoder quality is to check whether these features are present.
+Based on this intuition, we curated a set of 61 binary classification datasets (details in \autoref{table:probe-eval}). For each task, we train a 1d logistic probe on each latent using the Newton-Raphson method to predict the task, and record the best cross entropy loss (across latents).\footnote{This is similar to the approach of \citet{gurnee2023finding}, but always using $k = 1$, and regressing on autoencoder latents instead of neurons.}  That is:
+
+\begin{equation}
+    \min_{i,w,b} \mathbb E \left[ y \log \sigma \left(wz_i + b \right) + \left(1 - y \right) \log \left(1 - \sigma \left(wz_i + b \right) \right) \right]
+\end{equation}
+
+where $z_i$ is the $i$th pre-activation autoencoder latent, and $y$ is a binary label. 
+
+Results on GPT-2 small are shown in \autoref{fig:metric_grids_probe}.  We find that probe score increases and then decreases as $k$ increases. We find that TopK generally achieves better probe scores than ReLU (\autoref{fig:relu_vs_topk_probe}), and both are substantially better 
+than when using directly residual stream channels. See \autoref{fig:probes-over-training} for results on several GPT-4 autoencoders: we observe that this metric improves throughout training, despite there being no supervised training signal; and we find that it beats a baseline using channels of the residual stream. See \autoref{fig:probes-training-breakdown} for scores broken down by component.
+
+This metric has the advantage that it is computationally cheap. However, it also has a major limitation, which is that it leans on strong assumptions about what kinds of features are natural.
+
+
+\subsection{Finding simple explanations for features}
+\label{sec:explanations}
+
+Anecdotally, our autoencoders find many features that have quickly recognizable patterns that suggest explanations when viewing random activations (\autoref{sec:samples}). %
+However, this can create an ``illusion'' of interpretability \citep{bolukbasi2021interpretability}, where explanations are overly broad, and thus have good recall but poor precision.
+For example, \citet{bills2023language} propose an automated interpretability score which disproportionately depends on recall.  They find a feature activating at the end of the phrase ``don't stop'' or ``can't stop'', but an explanation activating on all instances of ``stop'' achieves a high interpretability score. As we scale autoencoders and the features get sparser and more specific, this kind of failure becomes more severe.
+
+
+
+
+
+
+
+
+\label{sec:n2g}
+
+
+
+\begin{figure}[t]
+\newcommand\dunderline[3][-1pt]{{%
+  \sbox0{#3}%
+  \ooalign{\copy0\cr\rule[\dimexpr#1-#2\relax]{\wd0}{#2}}}}
+\newcommand{\hlc}[2][yellow]{%
+    \ifx\relax#1\relax%
+        \colorlet{foo}{yellow}%
+    \else
+        \definecolor{foo}{HTML}{#1}%
+    \fi
+    \sethlcolor{foo}%
+    \hl{#2}%
+}
+\begin{multicols}{2}
+    \small
+    \raggedright
+    \textbf{(a) A feature with precision = 0.97, recall = 0.56} \\
+    \textbf{(b) A feature with precision = 0.06, recall = 0.05}
+\end{multicols}
+
+\hrule
+\vspace{-12pt}
+\setlength{\columnseprule}{0.4pt} %
+
+\begin{multicols}{2}
+    \scriptsize
+    \raggedright
+Recall Eval Sequences:\\[8pt] 
+\begingroup \setlength{\leftskip}{5mm} 
+\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{Therefore}\hlc[ffffff]{ she}\hlc[ffffff]{'s}\hlc[ffffff]{ not}\hlc[ffffff]{ going}\hlc[ffffff]{ to}\hlc[ffffff]{ play}\hlc[ffffff]{ pr}\dunderline{2pt}{\hlc[93e066]{anks}}\hlc[ffffff]{ but}\hlc[ffffff]{ to}\hlc[ffffff]{ give}\hlc[ffffff]{ a}\hlc[ffffff]{ sweet}\hlc[ffffff]{ time}\hlc[ffffff]{-}\hlc[ffffff]{a}\hlc[ffffff]{ rend}\hlc[ffffff]{ezvous}\\[8pt] 
+\hlc[ffffff]{ choice}\hlc[ffffff]{.}\hlc[ffffff]{ [}\hlc[ffffff]{Warning}\hlc[ffffff]{:}\hlc[ffffff]{ R}\hlc[ffffff]{ipe}\hlc[ffffff]{ with}\hlc[ffffff]{ Wine}\hlc[ffffff]{ P}\hlc[d2db66]{uns}\hlc[ffffff]{]}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{V}\hlc[ffffff]{ital}\hlc[ffffff]{ L}\hlc[ffffff]{acer}\hlc[ffffff]{da}\hlc[ffffff]{ (}\hlc[ffffff]{September}\\[8pt] 
+\hlc[ffffff]{.}\hlc[ffffff]{ [}\hlc[ffffff]{Warning}\hlc[ffffff]{:}\hlc[ffffff]{ Develop}\hlc[ffffff]{ed}\hlc[ffffff]{ with}\hlc[ffffff]{ Evolution}\hlc[ffffff]{ary}\hlc[ffffff]{ P}\hlc[cfd866]{uns}\hlc[ffffff]{]}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{Mail}\hlc[ffffff]{bags}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{T}\hlc[ffffff]{rial}\hlc[ffffff]{ \&}\\[8pt] 
+\hlc[ffffff]{al}\hlc[ffffff]{6}\hlc[ffffff]{606}\hlc[ffffff]{ Luke}\hlc[ffffff]{.}\hlc[ffffff]{A}\hlc[ffffff]{.}\hlc[ffffff]{M}\hlc[ffffff]{ me}\hlc[ffffff]{p}\hlc[dde466]{wn}\hlc[ffffff]{12}\hlc[ffffff]{ Thorn}\hlc[ffffff]{y}\hlc[ffffff]{ [}\hlc[ffffff]{B}\hlc[ffffff]{]}\hlc[ffffff]{Available}\hlc[ffffff]{ voice}\hlc[ffffff]{ actors}\hlc[ffffff]{,}\\[8pt] 
+\hlc[ffffff]{ his}\hlc[ffffff]{ picture}\hlc[ffffff]{ of}\hlc[ffffff]{ President}\hlc[ffffff]{ Putin}\hlc[ffffff]{.}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{President}\hlc[ffffff]{ Pr}\dunderline{2pt}{\hlc[a7e066]{ank}}\hlc[ffffff]{ster}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{D}\hlc[ffffff]{mit}\hlc[ffffff]{ry}\hlc[ffffff]{ Rog}\hlc[ffffff]{oz}\hlc[ffffff]{in}\hlc[ffffff]{,}\\[8pt] 
+\endgroup 
+Precision Eval Sequences:\\[8pt] 
+\begingroup \setlength{\leftskip}{5mm} 
+\hlc[ffffff]{ away}\hlc[ffffff]{:}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{It}\hlc[ffffff]{ching}\hlc[ffffff]{.}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{P}\dunderline{2pt}{\hlc[ccd766]{rick}}\hlc[ffffff]{ling}\hlc[ffffff]{.}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{These}\hlc[ffffff]{ are}\hlc[ffffff]{ not}\hlc[ffffff]{ all}\hlc[ffffff]{ of}\hlc[ffffff]{ the}\\[8pt] 
+\hlc[ffffff]{\%}\hlc[ffffff]{ 70}\hlc[ffffff]{\%}\hlc[ffffff]{ 99}\hlc[ffffff]{\%}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{71}\hlc[ffffff]{ No}\hlc[ffffff]{P}\dunderline{2pt}{\hlc[c9e066]{wn}}\hlc[ffffff]{1}\hlc[ffffff]{nt}\hlc[ffffff]{ended}\hlc[ffffff]{ i}\hlc[ffffff]{7}\hlc[ffffff]{-}\hlc[ffffff]{950}\hlc[ffffff]{ 3}\hlc[ffffff]{.}\hlc[ffffff]{4}\\[8pt] 
+\hlc[ffffff]{ott}\hlc[ffffff]{one}\hlc[ffffff]{e}\hlc[ffffff]{ Wh}\hlc[ffffff]{ims}\hlc[ffffff]{ic}\hlc[ffffff]{ott}\hlc[ffffff]{ M}\hlc[ffffff]{ 0}\hlc[ffffff]{ Pr}\dunderline{2pt}{\hlc[a3e066]{ank}}\hlc[ffffff]{ster}\hlc[ffffff]{ /}\hlc[ffffff]{ Inf}\hlc[ffffff]{iltr}\hlc[ffffff]{ator}\hlc[ffffff]{ Pr}\dunderline{2pt}{\hlc[b6e066]{ank}}\hlc[ffffff]{ster}\hlc[ffffff]{ /}\hlc[ffffff]{ Inf}\\[8pt] 
+\hlc[ffffff]{ of}\hlc[ffffff]{ Chimera}\hlc[ffffff]{ players}\hlc[ffffff]{ using}\hlc[ffffff]{ one}\hlc[ffffff]{-}\hlc[ffffff]{dimensional}\hlc[ffffff]{ teams}\hlc[ffffff]{:}\hlc[ffffff]{ Pr}\dunderline{2pt}{\hlc[99e066]{ank}}\\[8pt] 
+\hlc[ffffff]{ of}\hlc[ffffff]{ Chimera}\hlc[ffffff]{ players}\hlc[ffffff]{ using}\hlc[ffffff]{ one}\hlc[ffffff]{-}\hlc[ffffff]{dimensional}\hlc[ffffff]{ teams}\hlc[ffffff]{:}\hlc[ffffff]{ Pr}\dunderline{2pt}{\hlc[a5e066]{ank}}\hlc[ffffff]{ster}\hlc[ffffff]{ Sp}\hlc[ffffff]{ore}\hlc[ffffff]{S}\hlc[ffffff]{eed}\hlc[ffffff]{,}\hlc[ffffff]{ Shell}\hlc[ffffff]{ Smash}\hlc[ffffff]{,}\hlc[ffffff]{ Poison}\\[8pt] 
+\endgroup 
+
+	 \columnbreak
+Recall Eval Sequences:\\[8pt] 
+\begingroup \setlength{\leftskip}{5mm} 
+\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{M}\hlc[ffffff]{eal}\hlc[ffffff]{ 1}\hlc[ffffff]{ 06}\hlc[ffffff]{h}\hlc[eff266]{30}\hlc[ffffff]{ O}\hlc[ffffff]{ats}\hlc[ffffff]{,}\hlc[ffffff]{ double}\hlc[ffffff]{ serving}\hlc[ffffff]{ of}\hlc[ffffff]{ Whe}\hlc[ffffff]{y}\hlc[ffffff]{,}\hlc[ffffff]{ 6}\\[8pt] 
+\hlc[ffffff]{'s}\hlc[ffffff]{.}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{04}\hlc[ffffff]{Jul}\hlc[ffffff]{65}\hlc[ffffff]{ to}\hlc[ffffff]{ 01}\hlc[ffffff]{Aug}\hlc[e8ec66]{65}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{1}\hlc[ffffff]{/}\hlc[ffffff]{3}\hlc[ffffff]{ un}\\[8pt] 
+\hlc[ffffff]{ at}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{2013}\hlc[ffffff]{-}\hlc[ffffff]{11}\hlc[ffffff]{-}\hlc[ffffff]{16}\hlc[ffffff]{ 09}\hlc[ffffff]{:}\hlc[f4f666]{47}\hlc[ffffff]{:}\hlc[ffffff]{18}\hlc[ffffff]{ (}\hlc[ffffff]{25}\hlc[ffffff]{)}\hlc[ffffff]{ chat}\hlc[ffffff]{:}\hlc[ffffff]{ <}\hlc[ffffff]{Diamond}\hlc[ffffff]{Card}\\[8pt] 
+\hlc[ffffff]{0000}\hlc[ffffff]{ -}\hlc[ffffff]{ 00}\hlc[d9e066]{26}\hlc[d6de66]{00}\hlc[ffffff]{76}\hlc[ffffff]{]}\hlc[ffffff]{ 119}\hlc[ffffff]{ pages}\hlc[ffffff]{ 5}\hlc[ffffff]{:}\hlc[ffffff]{ [}\hlc[ffffff]{002}\hlc[ffffff]{60}\\[8pt] 
+\hlc[ffffff]{,}\hlc[ffffff]{ calm}\hlc[ffffff]{ it}\hlc[ffffff]{2013}\hlc[ffffff]{-}\hlc[ffffff]{11}\hlc[ffffff]{-}\hlc[ffffff]{11}\hlc[ffffff]{ 20}\hlc[ffffff]{:}\hlc[f2f466]{00}\hlc[ffffff]{:}\hlc[ffffff]{43}\hlc[ffffff]{ (}\hlc[ffffff]{25}\hlc[ffffff]{)}\hlc[ffffff]{ chat}\hlc[ffffff]{:}\hlc[ffffff]{ It}\hlc[ffffff]{'s}\hlc[ffffff]{ vanity}\\[8pt] 
+\endgroup 
+\vspace{35pt}
+Precision Eval Sequences:\\[8pt] 
+\begingroup \setlength{\leftskip}{5mm} 
+\hlc[ffffff]{1}\hlc[ffffff]{ Tue}\hlc[ffffff]{ Mar}\hlc[ffffff]{ 13}\hlc[ffffff]{ 22}\hlc[ffffff]{:}\hlc[ffffff]{37}\hlc[ffffff]{:}\hlc[ffffff]{59}\hlc[ffffff]{ EST}\dunderline{2pt}{\hlc[dce366]{ 2001}}\hlc[ffffff]{ i}\hlc[ffffff]{686}\hlc[ffffff]{ Loc}\hlc[ffffff]{ale}\hlc[ffffff]{:}\hlc[ffffff]{ L}\hlc[ffffff]{ANG}\hlc[ffffff]{=}\hlc[ffffff]{C}\\[8pt] 
+\hlc[ffffff]{K}\hlc[ffffff]{iw}\hlc[ffffff]{i}\hlc[ffffff]{76}\hlc[ffffff]{ added}\hlc[ffffff]{ 01}\hlc[ffffff]{:}\hlc[ffffff]{08}\hlc[ffffff]{ -}\hlc[ffffff]{ Apr}\dunderline{2pt}{\hlc[dee566]{ 28}}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{\textbackslash n}\hlc[ffffff]{Che}\hlc[ffffff]{ers}\hlc[ffffff]{ Clive}\hlc[ffffff]{ and}\hlc[ffffff]{ hopefully}\hlc[ffffff]{ you}\hlc[ffffff]{ can}\hlc[ffffff]{ see}\\[8pt] 
+\hlc[ffffff]{.}\hlc[ffffff]{aspx}\hlc[ffffff]{?}\hlc[ffffff]{key}\hlc[ffffff]{=}\hlc[ffffff]{24}\hlc[ffffff]{88}\hlc[ffffff]{58}\hlc[ffffff]{886}\hlc[ffffff]{|}\dunderline{2pt}{\hlc[ffffff]{0001}}\hlc[ffffff]{00}\hlc[ffffff]{\&}\hlc[ffffff]{C}\hlc[ffffff]{MC}\hlc[ffffff]{=}\hlc[ffffff]{\&}\hlc[ffffff]{PN}\hlc[ffffff]{=}\hlc[ffffff]{\&}\hlc[ffffff]{Is}\\[8pt] 
+\hlc[ffffff]{.}\hlc[ffffff]{aspx}\hlc[ffffff]{?}\hlc[ffffff]{key}\hlc[ffffff]{=}\hlc[ffffff]{24}\hlc[ffffff]{88}\hlc[ffffff]{58}\hlc[ffffff]{886}\hlc[ffffff]{|}\dunderline{2pt}{\hlc[ffffff]{0001}}\hlc[ffffff]{01}\hlc[ffffff]{\&}\hlc[ffffff]{C}\hlc[ffffff]{MC}\hlc[ffffff]{=}\hlc[ffffff]{\&}\hlc[ffffff]{PN}\hlc[ffffff]{=}\hlc[ffffff]{\&}\hlc[ffffff]{Is}\\[8pt] 
+\hlc[ffffff]{key}\hlc[ffffff]{=}\hlc[ffffff]{24}\hlc[ffffff]{88}\hlc[ffffff]{58}\hlc[ffffff]{886}\hlc[ffffff]{|}\dunderline{2pt}{\hlc[ffffff]{0001}}\hlc[ffffff]{02}\hlc[ffffff]{\&}\hlc[ffffff]{C}\hlc[ffffff]{MC}\hlc[ffffff]{=}\hlc[ffffff]{\&}\hlc[ffffff]{PN}\hlc[ffffff]{=}\hlc[ffffff]{\&}\hlc[ffffff]{Is}\\[8pt] 
+\endgroup 
+\end{multicols}
+
+    \caption{Qualitative examples of latents with high and low precision/recall N2G explanations.\\
+    Key: \hlc[93e066]{Green} = Ground truth feature activation, \dunderline{2pt}{Underline} = N2G predicted feature activation}
+    \label{fig:n2g_examples}
+\end{figure}
+
+
+Unfortunately, precision is extremely expensive to evaluate when the simulations are using GPT-4 as in \citet{bills2023language}. As an initial exploration, we focus on an improved version of Neuron to Graph (N2G) \citep{foote2023neuron}, a substantially less expressive but much cheaper method that outputs explanations in the form of collections of n-grams with wildcards.
+In the future, we would like to explore ways to make it more tractable to approximate precision for arbitrary English explanations. %
+
+To construct a N2G explanation, we start with some sequences that activate the latent. For each one, we find the shortest suffix that still activates the latent.\footnote{with at least half the original activation strength} We then check whether any position in the n-gram can be replaced by a padding token, to insert wildcard tokens. We also check whether the explanation should be dependent on absolute position by checking whether inserting a padding token at the beginning matters.
+We use a random sample of up to 16 nonzero activations to build the graph, and another 16 as true positives for computing recall.  %
+
+Results for GPT-2 small are found in \autoref{fig:metric_grids_n2g_recall} and \ref{fig:metric_grids_n2g_precision}.  Note that dense token patterns are trivial to explain, thus $n=2048,k=512$ latents are easy to explain on average since many latents activate extremely densely (see \autoref{sec:dense_solutions})\footnote{This highlights an issue with our precision/recall metrics, which care only about binarized values.  We also propose a more expensive metric which uses simulated values \autoref{sec:explanation-reconstruction} and addresses this issue.  %
+}.
+In general, autoencoders with more total latents and fewer active latents are easiest to model with N2G.
+
+
+We also obtain evidence that TopK models have fewer spurious positive activations than their ReLU counterparts.  N2G explanations have significantly better recall (>1.5x) and only slightly worse precision (>0.9x) for TopK models with the same $n$ (resulting in better F1 scores) and similar \Lzero (\autoref{fig:relu_vs_topk_n2g}).
+
+
+
+
+
+
+\subsection{Explanation reconstruction}
+\label{sec:explanation-reconstruction}
+
+When our goal is for a model's activations to be interpretable, one question we can ask is:  how much performance do we sacrifice if we use only the parts of the model that we can interpret?  
+
+Our downstream loss metric measures how much of the performance we're capturing (but our features could be uninterpretable), and our explanation based metric measures how monosemantic our features are (but they might not explain most of the model). This suggests combining our downstream loss and explanation metrics, by using our explanations to simulate autoencoder latents, and then checking downstream loss after decoding.  This metric also has the advantage that it values both recall and precision in a way that is principled, and also values recall more for latents that activate more densely.
+
+We tried this with N2G explanations.  N2G produces a simulated value based on the node in the trie, but we scale this value to minimize variance explained.  Specifically, we compute $E[sa]/E[s^2]$, where $s$ is the simulated value and $a$ is the true value, and we estimate this quantity over a training set of tokens.  %
+Results for GPT-2 are shown in \autoref{fig:explain-recons}.  We find that we can explain more of GPT-2 small than just explaining bigrams, and that larger and sparser autoencoders result in better downstream loss.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.65\textwidth]{figures/fig_gpt2sm_L8sweepnk_explain_recons_loss.png}
+    \caption{Downstream loss on GPT-2 with various residual stream ablations at layer 8.  N2G explanations of autoencoder latents improves downstream loss with larger $n$ and smaller $k$.}
+    \label{fig:explain-recons}
+\end{figure}
+
+
+
+
+\subsection{Sparsity of ablation effects}
+\label{sec:effects-sparsity}
+
+If the underlying computations learned by a language model are sparse,
+one hypothesis is that natural features are not only sparse in terms of activations,
+but also in terms of downstream effects \citep{olah2024open}.  Anecdotally, we observed that ablation effects often are interpretable (see our visualizer). 
+Therefore, we developed a metric to measure the sparsity of downstream effects on the output logits.
+
+At a particular token index, we obtain the latents at the residual stream, and proceed to ablate each autoencoder latent one by one, and compare the resulting logits before and after ablation. This process leads to $V$ logit differences per ablation and affected token, where $V$ is the size of the token vocabulary.  
+Because a constant difference at every logit does not affect the post-softmax probabilities,
+we subtract at each token the median logit difference value.  Finally, we concatenate these vectors together across some set of $T$ future tokens (at the ablated index or later) to obtain a vector of $V \cdot T$ total numbers.
+We then measure the sparsity of this vector via $(\frac{\text{L}_1}{\text{L}_2})^2$,
+which corresponds to an ``effective number of vocab tokens affected''. %
+We normalize by $V \cdot T$ to have a fraction between 0 and 1, with smaller values corresponding to sparser effects.  
+
+We perform this for various autoencoders trained on the post-MLP residual stream at layer 8 in GPT-2 small, with $T=16$. Results are shown in \autoref{fig:metric_grids_sparsity}.  Promisingly, models trained with larger $k$ have latents with sparser effects.  However, the trend reverses at $k=512$, indicating that as $k$ approaches $d_{\text{model}} = 768$, the autoencoder learns latents with less interpretable effects.  
+Note that latents are sparse in an absolute sense, having a $(\frac{\text{L}_1}{\text{L}_2})^2$ of 10-14\% 
+, whereas ablating residual stream channels gives 60\%
+ (slightly better than the theoretical value of $\sim\frac{2}{\pi}$ for random vectors).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

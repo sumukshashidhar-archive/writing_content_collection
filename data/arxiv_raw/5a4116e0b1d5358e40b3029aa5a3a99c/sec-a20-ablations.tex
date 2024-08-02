@@ -1,0 +1,49 @@
+\section{Training ablations}
+
+\subsection{Dead latent prevention}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/fig_gpt2sm_2M_dead_maxk_init.png}
+    \caption{Methods that reduce the number of dead latents (gpt2sm 2M, k=32).  With AuxK and/or tied initialization, number of dead latents generally decreases over the course of training, after an early spike.}
+    \label{fig:ablation-dead-latents}
+\end{figure}
+
+We find that the reduction in dead latents is mostly due to a combination of the AuxK loss and the tied initialization scheme.
+
+
+\subsection{Initialization}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/fig_gpt2sm_ablation_init.png}
+    \caption{Initialization ablation (gpt2sm 128k, k=32).}
+    \label{fig:init-ablation}
+\end{figure}
+
+We find that tied initialization substantially improves MSE, and that our encoder initialization scheme has no effect when tied initialization is being used, and hurts slightly on its own. 
+
+\subsection{$b_{\textrm{enc}}$}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/fig_gpt2sm_ablation_lbias.png}
+    \caption{$b_{\textrm{enc}}$ does not strongly affect loss (gpt2sm 128k, k=32).}
+    \label{fig:encoder-bias-ablation}
+\end{figure}
+We find that $b_{\textrm{enc}}$ does not affect the MSE at convergence. With $b_{\textrm{enc}}$ removed, the autencoder is equivalent to a JumpReLU where the threshold is dynamically chosen per example such that exactly $k$ latents are active. However, convergence is slightly slower without $b_{\textrm{enc}}$. We believe this may be confounded by encoder learning rate but did not investigate this further.  
+
+
+\subsection{Decoder normalization}
+
+After each step we renormalize columns of the decoder to be unit-norm, following \citet{bricken2023monosemanticity}. This normalization (or a modified L1 term, as in \citet{conerly2024update}) is necessary for L1 autoencoders, because otherwise the L1 loss can be gamed by making the latents arbitrarily small. For TopK autoencoders, the normalization is optional. However, we find that it still improves MSE, so we still use it in all of our experiments.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\linewidth]{figures/fig_gpt2sm_ablation_decodernorm.png}
+    \caption{The decoder normalization slightly improves loss (gpt2sm 128k, k=32).}
+    \label{fig:enter-label2}
+\end{figure}
+
+
+

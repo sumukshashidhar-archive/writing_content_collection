@@ -1,0 +1,111 @@
+\section{Scaling laws}
+\label{sec:scaling}
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{figure}
+\centering
+\begin{minipage}{.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_gpt4_lrsweep_k256.pdf}
+    \caption{Varying the learning rate jointly with the number of latents. Number of tokens to convergence shown above each point.}
+    \label{fig:lrsweepgpt4}
+\end{minipage}%
+\hspace{10pt}
+\begin{minipage}{.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_dmodel_scaling_2.pdf}
+    \caption{Larger subject models in the GPT-4 family require more latents to get to the same MSE ($k=32$).}
+    \label{fig:scaling_s}
+\end{minipage}
+\end{figure}
+
+
+
+\subsection{Number of latents} 
+
+
+Due to the broad capabilities of frontier models such as GPT-4, we hypothesize that faithfully representing model state will require large numbers of sparse features. We consider two primary approaches to choose autoencoder size and token budget:%
+
+\subsubsection{Training to compute-MSE frontier (\texorpdfstring{$L(C)$}{L(C)})}
+
+Firstly, following \citet{lindsey2024scaling}, we train autoencoders to the optimal MSE given the available compute, disregarding convergence.  This method was introduced for pre-training language models \citep{kaplan2020scaling,hoffmann2022training}.  We find that MSE follows a power law $L(C)$ of compute, though the smallest models are off trend
+(\autoref{fig:scaling_n}).
+
+However, latents are the important artifact of training (not reconstruction predictions), whereas for language models we typically care only about token predictions.  Comparing MSE across different $n$ is thus not a fair comparison --- the latents have a looser information bottleneck with larger $n$, so lower MSE is more easily achieved.  Thus, this approach is arguably unprincipled for autoencoder training. %
+
+
+
+\subsubsection{Training to convergence (\texorpdfstring{$L(N)$}{L(N)})}
+
+We also look at training autoencoders to convergence (within some $\epsilon$). This gives a bound on the best possible reconstruction achievable by our training method if we disregard compute efficiency. In practice, we would ideally train to some intermediate token budget between $L(N)$ and $L(C)$.
+
+We find that the largest learning rate that converges scales with $1/\sqrt{n}$ (\autoref{fig:lrsweepgpt4}). We also find that the optimal learning rate for $L(N)$ is about four times smaller than the optimal learning rate for $L(C)$.
+
+We find that the number of tokens to convergence increases as approximately $\Theta(n^{0.6})$ for GPT-2 small and $\Theta(n^{0.65})$ for GPT-4 (\autoref{fig:lr_tok_powerlaws}). This must break at some point -- if token budget continues to increase sublinearly, the number of tokens each latent receives gradient signal on would approach zero.\footnote{One slight complication is that in the infinite width limit, TopK autoencoders with our initialization scheme are actually optimal at init using our init scheme (\autoref{sec:init}), so this allows for an exponent very slightly less than $1$; however, this happens very slowly with $n$ so is unlikely to be a major factor at realistic scales.}
+
+\subsubsection{Irreducible loss}
+\label{sec:irred-loss}
+
+Scaling laws sometimes include an irreducible loss term $e$, such that $y = \alpha x^\beta + e$ \citep{henighan2020scaling}. We find that including an irreducible loss term substantially improves the quality of our fits for both $L(C)$ and $L(N)$.
+
+It was initially not clear to us that there should be a nonzero irreducible loss. 
+One possibility is that there are other kinds of structures in the activations.  In the extreme case, unstructured noise in the activations is substantially harder to model and would have an exponent close to zero (\autoref{sec:random-data-aes}). Existence of some unstructured noise would explain a bend in the power law.  %
+
+
+\subsubsection{Jointly fitting sparsity (\texorpdfstring{$L(N,K)$}{L(N, K)})}
+We find that MSE follows a joint scaling law along the number of latents $n$ and the sparsity level $k$ (\autoref{fig:scaling_n}b). Because reconstruction becomes trivial as $k$ approaches $d_{model}$, 
+this scaling law only holds for the small $k$ regime.
+Our joint scaling law fit on GPT-4 autoencoders is:
+\begin{equation}
+    \begin{aligned}
+        L(n,k) =\exp(\alpha+\beta_k\log(k)+\beta_n\log(n)+\gamma\log(k)\log(n)) + \exp(\zeta+\eta\log(k))
+    \end{aligned}
+\end{equation}
+with $\alpha = -0.50$, $\beta_k = 0.26$, $\beta_n = -0.017$, $\gamma = -0.042$, $\zeta = -1.32$, and $\eta = -0.085$.
+We can see that $\gamma$ is negative, 
+which means that the scaling law $L(N)$ gets steeper as $k$ increases. $\eta$ is negative too, which means that the irreducible loss decreases with $k$.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Subject model size \texorpdfstring{$L_s(N)$}{L\_s(N)}}
+
+
+Since language models are likely to keep growing in size, we would also like to understand how sparse autoencoders scale as the subject models get larger.
+We find that if we hold $k$ constant, larger subject models require larger autoencoders to achieve the same MSE, and the exponent is worse (\autoref{fig:scaling_s}). 
+
+
+
+
+
+
+
+
+
+
+
+

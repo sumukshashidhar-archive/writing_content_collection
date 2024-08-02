@@ -1,0 +1,83 @@
+\section{Learning to Compress}
+\label{sx:learning2compress}
+
+\subsection{Lossless and Lossy Compression}
+\label{sx:methods:lossless-lossy}
+Compression methods can be divided into \emph{lossless} and \emph{lossy} categories.
+Lossless compression aims to transform data in such a way that the original can be reinstantiated exactly.
+As digital information is ultimately discrete in nature, lossless compression methods typically proceed from an assumption that their input is a sequence of discrete tokens.
+While continuous-valued datasets are still discrete in the sense of being encoded as finite, binary strings, general purpose lossless compression methods often perform poorly due to the lack of readily discoverable statistical structure in this binary space.
+Empirically,~\citet{sdrbench_2020} find compression ratios (the ratio of the original data size to the compressed size) of less than 3 for a range of lossless compression algorithms~\citep{zstd, zfpy_2014, fpc_2009, blosc, fpzip_2006} applied to continuous-valued scientific datasets. For many research budgets, compressing a 100 PB atmospheric trajectory ensemble to 33 PB would not meaningfully address data storage challenges.
+
+For the output physical simulations,~\cite{simfs_girolamo_2019} propose to store trajectories as a sparse set of checkpoint frames spaced at regular time intervals, and re-simulate the discarded frames from the nearest preceding checkpoint. The compression ratio is dependent on the frame spacing, and re-simulation may incur significant computational cost. The methods we describe do not assume the existence of, or access to, the original data simulator.
+
+Lossy compression methods, by contrast, allow for some distortion in the recovered signal after decompression.
+There exists an inherent tension between the amount of compression (the obtained code's \emph{rate}) and the degree of distortion incurred, the \emph{rate-distortion trade-off}.
+The kind and degree of distortion acceptable depends heavily on the application domain, and the quantification and mitigation of application-relevant distortion is central to the design of compression methods.
+Domain knowledge also allows the algorithm designer to exploit known statistical regularities in the data to achieve higher compression at a fixed distortion level.
+
+Several error-bounded lossy compression algorithms have been designed for floating-point arrays \citep{sz3_algo,sz3_framework,zfpy_2014,tthresh_2020,sperr_2023}. Among those, we evaluate SZ3~\citep{sz3_algo,sz3_framework} and ZFP~\citep{zfpy_2014} and show in Section \ref{sx:discuss:error-bound} that these methods only achieve approximately $50\times$ compression.
+\citet{klower2021compressing}~proposes using lower-precision numbers to represent atmospheric states, effectively discretizing floating-point numbers by rounding them. This achieves compression ratios of up to 155 for temperature, at $\pm 0.4^\circ$~C median error. Neural network-based approaches for compression, that we describe further in the next section, have also recently been introduced by \citet{huang2022compressing} and \citet{han2024cra5}. 
+
+%Greater compression is possible when we can exploit the statistical regularities in the data, suggesting that far greater compression would be possible if we could use machine learning to train a compressor specifically for atmospheric data. When compared to the general-purpose compressors discussed above, we will find that the learned compressors we develop achieve comparable errors while providing a  $1000 \times$ compression.
+
+Our overall approach is best understood within the paradigm of \emph{transform coding}~\citep{goyal2001theoretical}, which underpins most modern methods for the compression of natural signals such as images, audio and video.
+In transform coding, the original signal is invertibly mapped into an alternative domain judged more suitable for lossy scalar quantization (for example, certain elements of the transformed representation are known to be less crucial to perceived quality for the reconstruction~\citep{wallace1992jpeg}), and a stream of bits representing indices in the reduced set of quantized scalars is losslessly compressed via entropy coding.
+The invertible transform is typically linear (e.g., the familiar JPEG format uses a discrete cosine transform on small square sub-regions), and designed to produce a collection of relatively uncorrelated scalars.
+Traditionally, the transform, quantization and entropy coding steps form wholly separate subsystems of a compression pipeline.
+While this modularity affords implementation benefits, recent advances in machine learning have demonstrated that quantization can be directly and fruitfully incorporated into scalable representation learning systems.
+In this work, we explore two such families of methods, the latter of which also employs a relaxation of the entropy coding objective to directly parameterize the rate-distortion trade-off.
+
+\subsection{Neural Compression}
+\label{sx:methods:networks}
+
+The methods explored in this work build upon the \emph{autoencoder} family~\citep{ackley1985learning,hinton1990connectionist} wherein a parameterized non-linear mapping (i.e.\ neural network, best thought of as the composition of an ``encoder'' and a ``decoder'' function) is fit to data, with the goal of the system reproducing its own input from an alternative representation; Figure \ref{fig:system} depicts the overall setup.
+Given that the identity function is otherwise trivially representable, constraints imposed on the functional form of an autoencoder (such as a low-dimensional ``bottleneck'' between encoder and decoder, or penalties imposed during optimization) guide the learning procedure in the direction of descriptive parsimony~\citep{elman1988learning,Cottrell1987}.
+Probabilistically motivated variants of autoencoders have seen wide use in learning low-dimensional representations of data, and have an established connection to compression theory, formalized in several ways through the minimum description length principle and bits-back-encoding~\citep{hinton1993autoencoders, grunwald2007minimum}, variational inference~\citep{rezende2014reparameterizationtrick,kingma2014vae}.
+
+In contrast to autoencoders, a recent line of work uses neural networks to represent continuous data directly, mapping spatial coordinates to their corresponding data values~\citep{dupont2022functa, xie2022neural_fields_beyond}. For example, the pixels of a single photograph can be used as a ``dataset'' from which to train a network to map pixel coordinates $(i, j)$ to the corresponding pixel color $(r, g, b)$. Once trained, the network's parameters serve as the compressed representation, and can be significantly more compact than the raw array of data they encode.
+\citet{huang2022compressing} demonstrate this on atmospheric data on a wide range of compression ratios, but this approach has the disadvantage that it requires training or fine-tuning the model for each new data point (although we note that there are now methods that use meta-learning to address this limitation \citep{coinplusplus_2022}).
+
+%This approach was initially developed for 3D scenes~\citep{mildenhall2020nerf} and has since been extended to other domains such as images and atmospheric states \citep{strumpler2022inrcompress, dupont2021coin,, kim2024hybrid}. \citet{coinplusplus_2022} removes the need to retrain a network from scratch for each new data point, by meta-learning a network for all data, and efficiently fine-tuning it to fit novel datapoints using modulations to its parameters.
+
+
+
+%Neural compression models take advantage of the ability of deep neural networks to learn efficient representations of data. Of the many types of neural network architectures, 
+
+%One of the strengths of neural network models is their capacity for learning representations of data \citep{lecun2015deep}, which enables generalisation \citep{lecun1989generalization} and which is often achieved by encoding inputs into sparse \citep{ranzato2007sparse} or low-dimensional representations. Autoencoder networks \citep{hinton1993autoencoders} and their variational versions \citep{rezende2014reparameterizationtrick,kingma2014vae} are a perfect example of learning a compressed representation of input data that can still reconstruct that data. The optimisation of these networks given data is a case of the Minimum Description Length principle  By consequence, autoencoders are an ideal choice for data compression. 
+%
+%We therefore train a neural network to map data to a compressed representation. This avoids having to train or fine-tune a network for each new data point, unlike in \citep{huang2022compressing}. 
+In an autoencoder, the encoder maps rich high-dimensional signals to lower-dimensional codes more suitable for storage or transmission, which can be lossily reconstructed by applying the decoder.
+The encoder-decoder framework has several advantages. Once trained, the encoder can be applied to data beyond its training set. The compressed representation can be designed to have the same spatial layout and topology as the input data, aiding interpretability. Of particular interest are strategies for learning \emph{discrete} representations with autoencoders, which lossless compression, and may facilitate direct, downstream use with sequence models such as transformers~\citep{vaswani2017transformer, nguyen2023climax}.
+We next describe several families of such autoencoders which achieve discrete representations using two different strategies.
+%and describe the architectural details in Appendix~\ref{sx:appendix:models}.
+
+% ---------
+
+% Use of spherical harmonics: "Spherical Fourier Neural Operators: Learning Stable Dynamics on the Sphere" \citep{bonev2023spherical}
+
+% While lossless compression allows to store data without loss of information, \cite{sdrbench_2020} find that lossless compressors such as~\citep{zstd,zfpy_2014,fpc_2009,blosc,fpzip_2006} produce low compression ratios, below 3, on a range of scientific 32-bit floating-point datasets.
+
+
+% \cite{simfs_girolamo_2019} propose to store checkpoints at regular time steps and re-simulate discarded data for missing steps from the closest saved results.
+% This method offers an explicit computation / storage trade-off by adjusting the time step between checkpoints.
+% It is also lossless, as simulations can be run to regenerate the discarded time steps.
+
+% \cite{nguyen2023climax}
+% \cite{klower2021compressing}
+% \cite{coinplusplus_2022} 
+
+% A recent line of work relies to coordinate-based neural networks to compress datasets.
+% These networks are optimized to map data coordinates to target signal values for each data sample~\cite{xie2022neural_fields_beyond}.
+% The stored neural network weights can be used at decompression time to predict the values of the original sample.
+% This approach has been initially developped for 3D scenes~\cite{mildenhall2020nerf} and has since been extended to other domains such as images~\cite{dupont2021coin,strumpler2022inrcompress} and atmospheric states \cite{dupont2021coin,huang2022compressing}.
+% Coordinate-based neural networks take numerical coordinates as input and have therefore the advantage to not be restricted to a specific grid resolution.
+% However, compared to traditional compression methods, optimizing a neural network for each sample is significantly slower and is therefore not practical for online compression of simulator outputs. \yhasson{Is that true ?}.
+% \cite{coinplusplus_2022} reduce fitting requirements at test time by learning a shared network across datapoints and storing modulations which can be computed using a few gradient steps for each sample.
+% \cite{tack2023learning} also proposes to speed-up neural network fitting by first learning a shared model, but only computes PSNR, no direct downstream use in compression.
+
+% \cite{kim2024hybrid} propose a hybrid representation of spherical data and compare compression results to \cite{huang2022compressing}.
+% They compress each time step separately and achieve slightly higher weighted RMSE and weights MAE errors for similar bits per pixel compared to~\cite{hoefler2023earth}, which compress the data in the temporal dimension as well.
+
+% Compression listed as key component of Earth Virtualization Engines (EVE) \cite{hoefler2023earth}.
+
