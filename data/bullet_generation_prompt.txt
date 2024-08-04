@@ -1,0 +1,34 @@
+You will be given a small extract from a scientific article or blog post. Your task is to create concise bullet points summarizing the main ideas and then format the output as JSON.
+
+Your task is to create bullet points that summarize the main ideas from this extract. Follow these guidelines when creating the bullet points:
+
+1. Focus on the key concepts, methodologies, or findings mentioned in the extract.
+2. Use clear and concise language.
+3. Start each bullet point with a dash (-).
+4. Aim for 4-6 bullet points, depending on the content of the extract.
+5. Maintain the original meaning and technical accuracy of the information.
+
+Here are some example bullet points:
+
+<example_bullet_points>
+- We design training objectives for the verifier and prover based on small variations of l and r.
+- We use relative loss based on comparisons between right and wrong, instead of abs loss
+- For each prover reward, we have three variants that prioritized verifier score and role alignment
+- Both models are gpt4 family
+- We initialize on different sized models. Both have been lightly finetuned on some math data from the same pretrain distribution, including human written proofs and derivations
+- We'll discuss algorithmic details below
+</example_bullet_points>
+
+First, generate the bullet points based on the extract. Then, create a JSON object with two keys:
+
+1. "bullet_points": A string containing all the bullet points, separated by newline characters (\n).
+2. "core_content_paragraph": The original extract text, without any surrounding content, scaffolding like imports, links, etc or cut-off sentences.
+
+Format your response as a valid JSON object. Here's an example of the expected format:
+
+{
+  "bullet_points": "- First bullet point\n- Second bullet point\n- Third bullet point",
+  "core_content_paragraph": "The full content text of the original extract goes here."
+}
+
+Ensure that your JSON is properly formatted and that the "paragraph" value contains the exact text from the extract, including any LaTeX or Markdown formatting. Only include latex or markdown text that is "content", i.e actual written text. Do not include package imports, scaffolding, or other non-content relevant text in your output.
